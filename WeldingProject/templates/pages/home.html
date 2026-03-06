@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}HoBo POS - လျှပ်စစ်ပစ္စည်းနှင့် စက်ပြင်ဆိုင်{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="text-center py-5">
+            <h1 class="display-4 mb-4">
+                <i class="fas fa-tools text-primary"></i> HoBo Custom Software POS
+            </h1>
+            <p class="lead text-muted mb-4">လျှပ်စစ်ပစ္စည်းနှင့် စက်ပြင်ဆိုင်များအတွက် ပြည့်စုံသော POS စနစ်</p>
+            
+            <div class="row g-4 mt-3">
+                <div class="col-md-4">
+                    <div class="card h-100 shadow-sm border-primary">
+                        <div class="card-body text-center">
+                            <i class="fas fa-cash-register fa-3x text-primary mb-3"></i>
+                            <h5>အရောင်းမှတ်တမ်း (POS)</h5>
+                            <p class="text-muted small">ဝန်ထမ်းများ အရောင်းမှတ်တမ်းတင်ရန်</p>
+                            <a href="{% url 'pos' %}" class="btn btn-primary">ဝင်ရောက်ရန်</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card h-100 shadow-sm border-success">
+                        <div class="card-body text-center">
+                            <i class="fas fa-wrench fa-3x text-success mb-3"></i>
+                            <h5>စက်ပြင်ခြေရာခံမှု</h5>
+                            <p class="text-muted small">Repair No. နှင့် ဖုန်းနံပါတ်ဖြင့် စစ်ဆေးပါ</p>
+                            <a href="{% url 'repair-track' %}" class="btn btn-success">စစ်ဆေးရန်</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card h-100 shadow-sm border-info">
+                        <div class="card-body text-center">
+                            <i class="fas fa-shield-alt fa-3x text-info mb-3"></i>
+                            <h5>အာမခံချက် စစ်ဆေးမှု</h5>
+                            <p class="text-muted small">Serial No. ဖြင့် Warranty စစ်ဆေးပါ</p>
+                            <a href="{% url 'warranty-check' %}" class="btn btn-info">စစ်ဆေးရန်</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-5">
+                {% if not user.is_authenticated %}
+                <a href="{% url 'login' %}" class="btn btn-success btn-lg me-2">
+                    <i class="fas fa-sign-in-alt me-2"></i>ဝန်ထမ်း ဝင်ရောက်ရန်
+                </a>
+                {% endif %}
+                <a href="/app/" class="btn btn-primary btn-lg">
+                    <i class="fas fa-th-large me-2"></i>Vue Dashboard (အပြည့်အစုံ)
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

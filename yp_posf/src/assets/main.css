@@ -1,0 +1,1010 @@
+/* source() helps path resolution in Docker (Tailwind v4) */
+@import 'tailwindcss' source("../");
+
+/* ==========================================================================
+   Fluid High-End Glassmorphism Design System (Facebook/Google-style)
+   Inter from Google Fonts (see index.html link)
+   ========================================================================== */
+
+@theme {
+  /* POS: teal theme (Login/Register နဲ့ ညီ) – app တစ်ခုလုံး တူညီ */
+  --color-primary: #0d9488;
+  --color-primary-dark: #0f766e;
+  --color-primary-light: #14b8a6;
+  --color-primary-focus: rgba(13, 148, 136, 0.18);
+  --color-bg: #ffffff;
+  --color-bg-light: #f8faf9;
+  --color-bg-card: #ffffff;
+  --color-text: #0f172a;
+  --color-text-muted: #475569;
+  --color-text-subtle: #64748b;
+  --color-border: #e2e8f0;
+  --color-fg-muted: #64748b;
+  --loyverse-blue: #0d9488;
+  /* Card elevation (readable, not flat) */
+  --card-radius: 14px;
+  --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 4px 12px rgba(0, 0, 0, 0.04);
+  --card-shadow-hover: 0 4px 14px rgba(0, 0, 0, 0.06), 0 10px 28px rgba(0, 0, 0, 0.05);
+  /* Neutral shadows (no red) */
+  --shadow-glow: 0 0 30px -5px rgba(0, 0, 0, 0.08), 0 0 60px -15px rgba(0, 0, 0, 0.05);
+  --shadow-glow-sm: 0 0 20px -5px rgba(0, 0, 0, 0.06);
+  --shadow-glow-lg: 0 0 40px -5px rgba(0, 0, 0, 0.1), 0 0 80px -20px rgba(0, 0, 0, 0.08);
+  --shadow-glow-hover: 0 0 50px -5px rgba(0, 0, 0, 0.12);
+  /* Cards: white with subtle border */
+  --surface-deep: #ffffff;
+  --surface-border: #e2e8f0;
+  --glass-blur: blur(12px);
+  --glass-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.04);
+  --glass-radius: 14px;
+  --sidebar-mini-width: 4.5rem;
+  --sidebar-expanded-width: 280px;
+  --fluid-gap: clamp(1rem, 2vw, 2.5rem);
+  --fluid-text-sm: clamp(1rem, 0.5vw + 0.95rem, 1.2rem);
+  --fluid-text-base: clamp(1.1rem, 0.5vw + 1rem, 1.35rem);
+  --fluid-text-md: clamp(1.05rem, 0.5vw + 1rem, 1.25rem);
+  --fluid-text-lg: clamp(1.2rem, 0.6vw + 1rem, 1.5rem);
+  --fluid-text-xl: clamp(1.35rem, 0.8vw + 1rem, 1.7rem);
+  --fluid-text-2xl: clamp(1.6rem, 1.2vw + 1rem, 2.2rem);
+  --surface: var(--surface-deep);
+}
+
+/* Responsive base: smaller on mobile so more content fits; scale up on desktop */
+html {
+  font-size: 15px;
+}
+@media (min-width: 640px) {
+  html { font-size: 16px; }
+}
+@media (min-width: 1024px) {
+  html { font-size: 17px; }
+}
+@media (min-width: 1280px) {
+  html { font-size: 18px; }
+}
+
+* {
+  font-family: 'Noto Sans Myanmar', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+body {
+  background-color: #ffffff;
+  color: #0a0a0a;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.5;
+}
+
+/* --- POS white/black cards (elevation scale) --- */
+.glass-surface,
+.glass-card {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--glass-radius);
+  box-shadow: var(--card-shadow);
+  transition: box-shadow 0.25s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.glass-card:hover,
+.glass-surface:hover {
+  box-shadow: var(--card-shadow-hover);
+  border-color: #cbd5e1;
+}
+
+/* Dashboard & content cards: consistent elevation and radius */
+.dashboard-card,
+.content-card {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--card-radius);
+  box-shadow: var(--card-shadow);
+  transition: box-shadow 0.25s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+.dashboard-card:hover,
+.content-card:hover {
+  box-shadow: var(--card-shadow-hover);
+  border-color: #cbd5e1;
+}
+
+/* Page title: consistent typography across app */
+.page-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+  line-height: 1.3;
+}
+@media (min-width: 640px) {
+  .page-title { font-size: 1.5rem; }
+}
+
+/* Table glass container */
+.glass-table-container {
+  background: transparent;
+  backdrop-filter: none;
+  border: none;
+  box-shadow: none;
+}
+
+.glass-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: transparent;
+}
+
+.glass-table thead {
+  background: var(--color-bg-light);
+}
+
+.glass-table thead th {
+  background: var(--color-bg-light);
+  color: var(--color-text);
+  font-weight: 600;
+  padding: clamp(0.875rem, 1vw, 1.125rem) clamp(1rem, 1.5vw, 1.5rem);
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+  font-size: var(--fluid-text-sm);
+  letter-spacing: 0.02em;
+}
+
+.glass-table tbody {
+  background: #ffffff;
+}
+
+.glass-table tbody tr {
+  background: #ffffff;
+  transition: background 0.15s ease;
+}
+
+.glass-table tbody tr:hover {
+  background: var(--color-bg-light);
+}
+
+.glass-table tbody td {
+  padding: clamp(0.875rem, 1vw, 1rem) clamp(1rem, 1.5vw, 1.5rem);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-size: var(--fluid-text-md);
+}
+
+.glass-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Responsive tables: horizontal scroll on small screens */
+.table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.table-wrap .glass-table {
+  min-width: 600px;
+}
+
+.glass-input {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-size: var(--fluid-text-sm);
+  min-height: 2.5rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+@media (min-width: 640px) {
+  .glass-input { min-height: 2.25rem; }
+}
+
+.glass-input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-focus, rgba(13, 148, 136, 0.18));
+  outline: none;
+}
+
+.glass-input::placeholder {
+  color: var(--color-text-subtle);
+}
+
+select.glass-input,
+.glass-select,
+select[class*="glass"] {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23525252' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  padding-right: 2rem;
+}
+select.glass-input option,
+.glass-select option {
+  background: #ffffff;
+  color: var(--color-text);
+}
+select.glass-input:focus,
+.glass-select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.15);
+}
+
+.glass-label {
+  color: var(--color-text-muted);
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  font-size: var(--fluid-text-sm);
+}
+
+/* --- Sidebar active link (white/black) --- */
+.sidebar-link-active {
+  background: var(--color-bg-light) !important;
+  color: var(--color-text) !important;
+  border-left: 3px solid var(--color-primary);
+  font-weight: 600;
+}
+
+/* --- Buttons (unified: min-height 44px, consistent padding & radius) --- */
+.btn-primary,
+.loyverse-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  padding: 0.625rem 1.25rem;
+  background: var(--color-primary);
+  color: #ffffff !important;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  line-height: 1.25;
+  border: none;
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.1s ease;
+  cursor: pointer;
+}
+
+.btn-primary *,
+.loyverse-btn-primary * {
+  color: inherit;
+}
+
+.btn-primary:hover:not(:disabled),
+.loyverse-btn-primary:hover:not(:disabled) {
+  background: var(--color-primary-light);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.btn-primary:active:not(:disabled),
+.loyverse-btn-primary:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.btn-primary:disabled,
+.loyverse-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.btn-secondary,
+.loyverse-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  padding: 0.625rem 1.25rem;
+  background: var(--color-bg);
+  color: var(--color-text) !important;
+  font-weight: 500;
+  font-size: 0.9375rem;
+  line-height: 1.25;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.1s ease;
+  cursor: pointer;
+}
+
+.btn-secondary *,
+.loyverse-btn-secondary * {
+  color: inherit;
+}
+
+.btn-secondary:hover:not(:disabled),
+.loyverse-btn-secondary:hover:not(:disabled) {
+  background: var(--color-bg-light);
+  border-color: #d4d4d4;
+  color: var(--color-text);
+}
+
+.btn-secondary:active:not(:disabled),
+.loyverse-btn-secondary:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.btn-secondary:disabled,
+.loyverse-btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* --- Fluid layout --- */
+.bg-premium {
+  background: var(--color-bg);
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.bg-premium-dark {
+  background-color: var(--color-bg);
+}
+
+/* Standard admin layout root (same as bg-premium, no min-height) */
+.bg-background {
+  background: var(--color-bg);
+}
+
+.text-premium { color: var(--color-text); }
+.text-premium-muted { color: var(--color-text-muted); }
+.text-premium-subtle { color: var(--color-text-subtle); }
+
+.link-premium {
+  color: var(--color-text-muted);
+  transition: color 0.2s ease;
+  text-decoration: none;
+}
+
+.link-premium:hover {
+  color: var(--color-primary-light);
+}
+
+/* Fluid layout container: responsive padding + max-width on large screens */
+.layout-container {
+  width: 100%;
+  max-width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: clamp(0.75rem, 4vw, var(--fluid-gap));
+  padding-right: clamp(0.75rem, 4vw, var(--fluid-gap));
+}
+@media (min-width: 1280px) {
+  .layout-container {
+    max-width: 1400px;
+  }
+}
+
+.fluid-gap {
+  gap: var(--fluid-gap);
+}
+
+/* Page wrapper: consistent responsive padding */
+.page-content {
+  width: 100%;
+  padding: clamp(0.75rem, 3vw, 1.5rem);
+}
+@media (min-width: 768px) {
+  .page-content {
+    padding: clamp(1rem, 4vw, 2rem);
+  }
+}
+
+/* Responsive grid: 1 col mobile, 2–3 on tablet/desktop */
+.responsive-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: clamp(0.75rem, 3vw, 1.25rem);
+}
+@media (min-width: 640px) {
+  .responsive-grid-2 { grid-template-columns: repeat(2, 1fr); }
+}
+.responsive-grid-3 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: clamp(0.75rem, 3vw, 1.25rem);
+}
+@media (min-width: 640px) {
+  .responsive-grid-3 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (min-width: 1024px) {
+  .responsive-grid-3 { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* Safe area */
+.safe-area-pb {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+.safe-area-pt {
+  padding-top: max(0.5rem, env(safe-area-inset-top));
+}
+
+/* Touch: reduce tap delay; Focus: visible ring for keyboard users */
+.touch-manipulation {
+  touch-action: manipulation;
+}
+
+*:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+button:focus-visible,
+a:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Fluid typography utilities */
+.text-fluid-sm { font-size: var(--fluid-text-sm); }
+.text-fluid-base { font-size: var(--fluid-text-base); }
+.text-fluid-lg { font-size: var(--fluid-text-lg); }
+.text-fluid-xl { font-size: var(--fluid-text-xl); }
+
+/* Scrollbar: light theme (visible thumb) */
+.custom-scrollbar {
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: var(--color-bg-light);
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #d4d4d4;
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #a3a3a3;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes toast-out {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-6px); }
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Prevent horizontal overflow globally */
+body, html {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Chart gradients (teal tint, theme နဲ့ ညီ) */
+.chart-gradient-red {
+  background: linear-gradient(180deg, rgba(13, 148, 136, 0.2) 0%, rgba(13, 148, 136, 0.06) 50%, transparent 100%);
+  filter: drop-shadow(0 0 12px rgba(0, 0, 0, 0.1));
+}
+
+.chart-glow-red {
+  filter: drop-shadow(0 0 10px rgba(0, 0, 0, 0.12));
+}
+
+/* Micro-interactions (non-button elements: cards, links) */
+.interactive {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  cursor: pointer;
+}
+
+.interactive:hover {
+  transform: translateY(-1px);
+}
+
+.interactive:active {
+  transform: translateY(0);
+}
+
+/* Buttons: .interactive နဲ့ တွဲသုံးရင် ခလုတ် active effect (scale) ပဲ သုံးမယ် */
+button.interactive:hover,
+.btn-primary.interactive:hover,
+.btn-secondary.interactive:hover {
+  transform: translateY(-1px);
+}
+
+button.interactive:active:not(:disabled),
+.btn-primary.interactive:active:not(:disabled),
+.btn-secondary.interactive:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+/* Smooth button animations – ချိန်ခိုင်းထားတဲ့ transition သုံးမယ် */
+button,
+.btn-primary,
+.btn-secondary,
+.loyverse-btn-primary,
+.loyverse-btn-secondary {
+  transition: background 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
+}
+
+/* အတန်းအစား မပါတဲ့ ခလုတ်များ စာသားမြင်ရအောင် */
+button:not([class*="btn-"]):not([class*="loyverse"]):not(.auth-btn):not(.pos-btn) {
+  color: var(--color-text);
+}
+
+button:active:not(:disabled),
+.btn-primary:active:not(:disabled),
+.btn-secondary:active:not(:disabled),
+.loyverse-btn-primary:active:not(:disabled),
+.loyverse-btn-secondary:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+/* Disabled ခလုတ်များ နှိပ်လို့မရအောင် */
+button:disabled,
+[type='submit']:disabled,
+[type='button']:disabled {
+  pointer-events: none;
+}
+
+/* ==========================================================================
+   POS white/black theme (MM Edition)
+   ========================================================================== */
+:root {
+  --loyverse-blue: #0d9488;
+  --loyverse-blue-hover: #14b8a6;
+  --loyverse-radius: 12px;
+  --color-fg: #0f172a;
+  --color-fg-muted: #64748b;
+  --color-bg: #ffffff;
+  --color-bg-light: #f8faf9;
+  --color-bg-card: #ffffff;
+  --color-border: #e2e8f0;
+  --color-primary: #0d9488;
+  --color-primary-hover: #14b8a6;
+  --color-primary-focus: rgba(13, 148, 136, 0.18);
+  --card-radius: 14px;
+  --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 4px 12px rgba(0, 0, 0, 0.04);
+  --card-shadow-hover: 0 4px 14px rgba(0, 0, 0, 0.06), 0 10px 28px rgba(0, 0, 0, 0.05);
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-fg);
+}
+
+.text-fg { color: var(--color-fg); }
+.text-fg-muted { color: var(--color-fg-muted); }
+.bg-bg { background-color: var(--color-bg); }
+.border-border { border-color: var(--color-border); }
+
+/* Replace glass with simple cards */
+.settings-card,
+.glass-card,
+.glass-surface {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  backdrop-filter: none;
+}
+
+/* Settings page: light card so text is readable */
+.settings-card-light {
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+}
+.settings-card-light .glass-card {
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+}
+.settings-card-light .glass-card .bg-white\/5,
+.settings-card-light .glass-card .hover\:bg-white\/10:hover {
+  background: #f9fafb;
+}
+.settings-card-light .glass-card .border-white\/20 {
+  border-color: var(--color-border);
+}
+.glass-card:hover,
+.glass-surface:hover {
+  background: #f3f4f6;
+  transform: none;
+}
+
+.glass-input,
+select.glass-input,
+.glass-select,
+select[class*="glass"] {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  color: var(--color-fg);
+  backdrop-filter: none;
+}
+.glass-input::placeholder {
+  color: var(--color-fg-muted);
+}
+.glass-label {
+  color: var(--color-fg-muted);
+}
+
+/* Bilingual: Myanmar Unicode + English. Noto Sans Myanmar embedded for UI and PDF/receipts. */
+.invoice-print-myanmar,
+.invoice-print-myanmar *,
+#printable-invoice, #printable-invoice * {
+  font-family: 'Noto Sans Myanmar', 'Inter', sans-serif !important;
+}
+
+/* Noto Sans Myanmar 25px everywhere (Loyverse-style MM Edition) */
+body, .pos-text, .pos-btn, .a11y-select, .a11y-page-title, .a11y-section-title,
+input, select, button, label, span, p, h1, h2, h3, .pos-layout, .pos-layout * {
+  font-family: 'Noto Sans Myanmar', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+.pos-layout, .pos-layout input, .pos-layout select, .pos-layout button, .pos-layout label,
+.pos-layout span, .pos-layout p, .pos-layout h1, .pos-layout h2, .pos-layout h3 {
+  font-size: 22px;
+  color: #000000;
+}
+.pos-layout label,
+.pos-layout input,
+.pos-layout select,
+.pos-layout .text-fg,
+.pos-layout .text-fg-muted {
+  color: #000000 !important;
+}
+.pos-layout input,
+.pos-layout select {
+  background: #ffffff !important;
+  border: 1px solid #000000 !important;
+}
+
+/* Loyverse: 80px touch targets, 12px radius, Loyverse Blue */
+.pos-btn {
+  min-height: 80px;
+  height: auto;
+  padding: 0.5rem 1.5rem;
+  font-size: 25px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #fff;
+  border-radius: var(--loyverse-radius);
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Noto Sans Myanmar', 'Inter', sans-serif;
+}
+.pos-btn-pay, .payment-method-btn.pos-btn-pay {
+  background: var(--color-primary);
+  color: #fff !important;
+}
+
+.pos-btn *,
+.pos-btn-pay *,
+.payment-method-btn.pos-btn-pay * {
+  color: inherit;
+}
+
+/* .pos-layout button { color: #000000 } မလွှမ်းမိုးအောင် */
+.pos-layout .pos-btn,
+.pos-layout .pos-btn-pay,
+.pos-layout .payment-method-btn.pos-btn-pay {
+  color: #fff !important;
+}
+
+.pos-btn-pay:hover:not(:disabled), .payment-method-btn.pos-btn-pay:hover:not(:disabled) {
+  background: var(--color-primary-light);
+}
+
+/* Loyverse content page buttons: use .btn-primary / .btn-secondary above */
+
+.a11y-select {
+  min-height: 80px;
+  font-size: 25px;
+  font-weight: 600;
+  line-height: 1.4;
+  font-family: 'Noto Sans Myanmar', 'Inter', sans-serif;
+  border-radius: var(--loyverse-radius);
+}
+.a11y-icon {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+}
+.pos-text {
+  font-size: 22px;
+  font-weight: 500;
+  line-height: 1.4;
+  font-family: 'Noto Sans Myanmar', 'Inter', sans-serif;
+  color: #000000;
+}
+.loyverse-page .a11y-page-title {
+  font-size: 48px;
+  font-weight: 600;
+  color: var(--color-fg);
+}
+
+/* POS layout: 60% Left = Products (search, categories, cards), 40% Right = Cart/Order (Loyverse-style) */
+.pos-layout {
+  display: flex;
+  flex-direction: column;
+  min-height: min(calc(100vh - 8rem), 900px);
+  height: 100%;
+}
+.pos-layout .pos-split {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+@media (min-width: 768px) {
+  .pos-layout .pos-split {
+    grid-template-columns: 60% 40%;
+    grid-template-rows: 1fr;
+  }
+  .pos-layout .pos-products {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .pos-layout .pos-ticket {
+    min-width: 0;
+    border-radius: var(--loyverse-radius);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .pos-layout .pos-ticket .ticket-footer {
+    flex-shrink: 0;
+  }
+  .pos-layout .pos-product-grid {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+}
+/* Product grid: white cards, soft shadow, 12px radius */
+.pos-product-card {
+  background: #ffffff;
+  border-radius: var(--loyverse-radius);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.06);
+  border: 1px solid var(--color-border);
+}
+.pos-product-card:hover {
+  box-shadow: 0 4px 12px rgba(13, 148, 136, 0.15), 0 2px 8px rgba(0, 0, 0, 0.08);
+  border-color: rgba(13, 148, 136, 0.35);
+}
+
+/* Sidebar: fixed 260px when expanded, horizontal text, icons + labels to the right */
+.sidebar-rail {
+  background: #ffffff !important;
+  border-color: #000000 !important;
+  width: var(--sidebar-expanded-width, 260px);
+}
+.sidebar-rail .sidebar-nav-item,
+.sidebar-rail .sidebar-nav-subitem,
+.sidebar-rail .sidebar-link,
+.sidebar-rail .sidebar-link-active,
+.sidebar-rail span,
+.sidebar-rail p,
+.sidebar-rail button {
+  color: #000000 !important;
+}
+.sidebar-rail .sidebar-link-active {
+  background: rgba(13, 148, 136, 0.12) !important;
+  color: var(--color-primary) !important;
+}
+.app-shell > div > header {
+  background: var(--color-bg-card) !important;
+  border-color: var(--color-border) !important;
+}
+.app-shell > div > header * {
+  color: var(--color-fg) !important;
+}
+
+/* Ticket footer: sticky at bottom on mobile so ငွေချေမည် is always visible */
+/* Myanmar text: prevent clipping of tall characters in 80px controls */
+.leading-myanmar {
+  line-height: 1.45;
+  font-family: 'Noto Sans Myanmar', 'Inter', sans-serif;
+}
+.font-myanmar {
+  font-family: 'Noto Sans Myanmar', 'Inter', sans-serif;
+}
+
+.ticket-footer {
+  margin-top: auto;
+  flex-shrink: 0;
+}
+
+/* Auth pages: teal theme (reference design) + Loyverse-style clean */
+.auth-page {
+  --color-primary: #0d9488;
+  --color-primary-light: #14b8a6;
+  --color-primary-dark: #0f766e;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f0fdfa 0%, #ffffff 50%, #f0f9ff 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  font-size: 25px;
+  font-family: 'Noto Sans Myanmar', 'Inter', sans-serif;
+  color: #1a1a1a;
+}
+.auth-page h1, .auth-page h2, .auth-page p, .auth-page label, .auth-page span, .auth-page a {
+  font-size: 25px !important;
+  color: #1a1a1a !important;
+}
+.auth-page .text-sm, .auth-page .text-xl, .auth-page .text-2xl, .auth-page [class*="text-"] {
+  font-size: 25px !important;
+  color: #1a1a1a !important;
+}
+.auth-page .auth-link { color: var(--color-primary) !important; }
+.auth-page .auth-link:hover { color: var(--color-primary-light) !important; }
+.auth-page .login-logo,
+.auth-page .auth-logo,
+.auth-card img[alt="Logo"],
+.auth-page .h-16,
+.auth-page .w-16 {
+  width: 96px !important;
+  height: 96px !important;
+  min-width: 96px;
+  min-height: 96px;
+  object-fit: contain;
+}
+.auth-page .auth-lang-toggle { display: flex; justify-content: flex-end; gap: 0.5rem; margin-bottom: 1rem; }
+.auth-page .auth-lang-btn {
+  min-height: 44px;
+  font-size: 1rem !important;
+  padding: 0.5rem 1rem;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-family: 'Noto Sans Myanmar', 'Inter', sans-serif;
+  font-weight: 500;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+.auth-page .auth-lang-btn:hover { background: var(--color-bg-light); color: var(--color-text); }
+.auth-page .auth-lang-btn.active {
+  background: var(--color-primary);
+  color: #fff;
+  border-color: var(--color-primary);
+}
+.auth-page svg, .auth-page .animate-spin {
+  width: 1.2em !important;
+  height: 1.2em !important;
+  min-width: 30px;
+  min-height: 30px;
+}
+.auth-card {
+  width: 100%;
+  max-width: 420px;
+  background: #ffffff;
+  border-radius: 1.25rem;
+  box-shadow: 0 4px 24px rgba(13, 148, 136, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04);
+  border: 1px solid #e5e7eb;
+  padding: 2rem 2rem;
+  font-size: 25px;
+  color: #1a1a1a;
+}
+.auth-card .auth-btn:hover:not(:disabled) {
+  background: #0f766e;
+}
+.auth-card .auth-link:hover {
+  color: #0f766e;
+}
+.auth-card .auth-input {
+  min-height: 80px;
+  font-size: 25px !important;
+  font-family: 'Noto Sans Myanmar', 'Inter', sans-serif;
+  border-radius: var(--loyverse-radius);
+  border: 1px solid var(--color-border);
+  padding: 0 1rem;
+}
+.auth-card .auth-input-text,
+.auth-card .auth-input.auth-input-text,
+.auth-page .auth-input-text,
+.auth-page input.auth-input {
+  color: #000000 !important;
+  background: #ffffff !important;
+  font-size: 25px !important;
+}
+.auth-page .auth-input::placeholder {
+  color: #6b7280;
+  font-size: 25px;
+}
+.auth-card .auth-label {
+  font-size: 25px !important;
+  font-family: 'Noto Sans Myanmar', 'Inter', sans-serif;
+  color: #000000 !important;
+}
+.auth-card .auth-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  padding: 0.75rem 1.5rem;
+  font-size: 1.0625rem !important;
+  font-family: 'Noto Sans Myanmar', 'Inter', sans-serif;
+  background: var(--color-primary);
+  color: #fff !important;
+  border-radius: 10px;
+  border: none;
+  font-weight: 600;
+  transition: background 0.2s ease, transform 0.1s ease;
+  cursor: pointer;
+}
+
+.auth-card .auth-btn * {
+  color: inherit;
+}
+.auth-card .auth-btn:hover:not(:disabled) {
+  background: var(--color-primary-light);
+}
+.auth-card .auth-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+.auth-card .auth-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.auth-card .auth-link {
+  color: var(--color-primary);
+  font-weight: 600;
+  font-size: 25px !important;
+}
+.auth-card .auth-link:hover {
+  color: var(--color-primary-light);
+}
+
+/* Universal Myanmar Cloud POS: high-contrast, no complex animations */
+.pos-layout,
+.pos-layout * {
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.pos-layout .pos-product-card:hover,
+.pos-layout button:hover:not(:disabled) {
+  transform: none;
+}
+.pos-layout .pos-btn-pay:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+@media (max-width: 1023px) {
+  .pos-ticket {
+    min-height: 50vh;
+    display: flex;
+    flex-direction: column;
+  }
+  .ticket-footer {
+    position: sticky;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--color-bg-card);
+    padding-top: 1rem;
+    padding-bottom: env(safe-area-inset-bottom, 0);
+    border-top: 1px solid var(--color-border);
+    z-index: 10;
+  }
+}

@@ -1,0 +1,118 @@
+# HoBo POS - One Month Trial (Google instance / Docker)
+# Run from one_month_trial: docker compose -f compose/docker-compose.yml up -d --build
+# App: http://localhost:${FRONTEND_PORT:-8888}/app/
+
+services:
+  redis:
+    image: redis:7-alpine
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-hobo_redis}
+    command: sh -c "redis-server --requirepass \"$$REDIS_PASSWORD\" --appendonly yes"
+    ports:
+      - "${REDIS_PORT:-6380}:6379"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-hobo_pos}
+      POSTGRES_USER: ${POSTGRES_USER:-hobo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hobo_secret}
+      POSTGRES_INITDB_ARGS: "-E UTF8 --locale=en_US.UTF-8"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5434}:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hobo}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  backend:
+    build:
+      context: ..
+      dockerfile: WeldingProject/Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-/api}
+        VITE_BASE: ${VITE_BASE:-/app/}
+    command: >
+      sh -c "
+        for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+          if python -c \"import socket; socket.gethostbyname('postgres')\" 2>/dev/null; then break; fi;
+          echo \"wait postgres $$i/20\"; sleep 3;
+        done &&
+        (mkdir -p /app/static_frontend 2>/dev/null || true) &&
+        (if [ -d /frontend_dist ] && [ \"\$(ls -A /frontend_dist 2>/dev/null)\" ]; then cp -r /frontend_dist/* /app/static_frontend/;
+        elif [ -d /app/frontend_built ] && [ \"\$(ls -A /app/frontend_built 2>/dev/null)\" ]; then cp -r /app/frontend_built/* /app/static_frontend/; fi) &&
+        python manage.py migrate --noinput &&
+        python manage.py seed_base_units &&
+        python manage.py collectstatic --noinput --clear &&
+        exec daphne -b 0.0.0.0 -p 8000 WeldingProject.asgi:application
+      "
+    environment:
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:-change-me-in-production}
+      - DJANGO_DEBUG=${DJANGO_DEBUG:-False}
+      - HOBOPOS_SHOW_LOGIN_ERROR=${HOBOPOS_SHOW_LOGIN_ERROR:-true}
+      - DEPLOYMENT_MODE=${DEPLOYMENT_MODE:-hosted}
+      - SKIP_LICENSE=${SKIP_LICENSE:-true}
+      - DJANGO_ALLOWED_HOSTS=${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,backend,frontend}
+      - CORS_ALLOW_ALL=${CORS_ALLOW_ALL:-False}
+      - CORS_EXTRA_ORIGINS=${CORS_EXTRA_ORIGINS:-http://frontend,http://frontend:80}
+      - DATABASE_URL=postgres://${POSTGRES_USER:-hobo}:${POSTGRES_PASSWORD:-hobo_secret}@postgres:5432/${POSTGRES_DB:-hobo_pos}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-hobo_redis}@redis:6379/0
+      - MACHINE_ID=${MACHINE_ID:-}
+    volumes:
+      - backend_static_frontend:/app/static_frontend
+      - media_volume:/app/media
+      - license_data:/app/data
+      - ../yp_posf/dist:/frontend_dist:ro
+    ports:
+      - "${BACKEND_PORT:-8001}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health/').raise_for_status()"]
+      interval: 15s
+      timeout: 10s
+      retries: 15
+      start_period: 180s
+
+  frontend:
+    build:
+      context: ../yp_posf
+      args:
+        VITE_API_URL: ${VITE_API_URL:-/api}
+        VITE_BASE: ${VITE_BASE:-/app/}
+    ports:
+      - "${FRONTEND_PORT:-8888}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost/ -o /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+networks:
+  default: {}
+
+volumes:
+  postgres_data:
+  backend_static_frontend:
+  media_volume:
+  license_data:

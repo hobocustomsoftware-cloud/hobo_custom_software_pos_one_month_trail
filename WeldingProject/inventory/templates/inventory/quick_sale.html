@@ -1,0 +1,458 @@
+{% extends "base.html" %} 
+{% load static %}
+
+{% block title %}Quick Sale POS{% endblock %}
+
+{% block content %}
+    {% csrf_token %}
+    {% verbatim %}
+        <div id="quick-sale-app" class="container-fluid py-4">
+            <h2 class="mb-4">⚡ Quick Sale / POS Terminal</h2>
+            <div v-if="assignedLocations.length > 1" class="mb-3">
+                <label class="form-label">ယနေ့အလုပ်လုပ်မည့်ဆိုင်:</label>
+                <select v-model="selectedLocationId" @change="onLocationChange" class="form-select form-select-sm" style="max-width: 300px;">
+                    <option value="">-- ရွေးချယ်ပါ --</option>
+                    <option v-for="loc in assignedLocations" :key="loc.id" :value="loc.id">{{ loc.name }}</option>
+                </select>
+                <small v-if="currentLocation" class="text-muted ms-2">လက်ရှိ: {{ currentLocation.name }}</small>
+            </div>
+            <div class="row">
+                
+                <div class="col-md-5">
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">Product Selection</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="input-group mb-3">
+                                <input 
+                                    type="text" 
+                                    class="form-control form-control-lg" 
+                                    v-model="scanInput"
+                                    @keyup.enter="scanProduct"
+                                    placeholder="Scan Barcode or Enter SKU"
+                                    autofocus
+                                >
+                                <button class="btn btn-success" @click="scanProduct">
+                                    <i class="fas fa-search"></i> Add
+                                </button>
+                            </div>
+                            
+                            <div v-if="message" :class="['alert', messageType]">
+                                {{ message }}
+                            </div>
+
+                            <hr>
+
+                            <h6>Available Products (Shop Floor Stock)</h6>
+                            <ul class="list-group product-list" style="max-height: 400px; overflow-y: auto;">
+                                <li 
+                                    v-for="product in products" 
+                                    :key="product.id"
+                                    class="list-group-item d-flex justify-content-between align-items-center"
+                                >
+                                    <div>
+                                        <strong @click="addProductToCart(product)" style="cursor: pointer; color: #007bff;">
+                                            {{ product.name }} 
+                                        </strong>
+                                        <small class="d-block text-muted">SKU: {{ product.sku }}</small>
+                                    </div>
+                                    <div>
+                                        <span class="badge bg-info me-2">Stock: {{ product.shop_stock || product.total_stock || 0 }}</span>
+                                        <strong>{{ product.retail_price }} MMK</strong>
+                                    </div>
+                                    <button class="btn btn-sm btn-primary" @click="addProductToCart(product)">
+                                        <i class="fas fa-plus"></i>
+                                    </button>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-7">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0">Sales Cart (Items: {{ cartItems.length }})</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label">ဝယ်ယူသူ (ရွေးချယ်မည်)</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" v-model="customerSearch" 
+                                           @input="searchCustomers" placeholder="အမည် သို့မဟုတ် ဖုန်းနံပါတ်ဖြင့် ရှာပါ">
+                                    <button class="btn btn-outline-secondary" type="button" @click="clearCustomer" v-if="selectedCustomer">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                                <ul v-if="customerSuggestions.length" class="list-group mt-1" style="max-height: 150px; overflow-y: auto;">
+                                    <li v-for="c in customerSuggestions" :key="c.id" class="list-group-item list-group-item-action" 
+                                        @click="selectCustomer(c)" style="cursor: pointer;">
+                                        {{ c.name }} - {{ c.phone_number }}
+                                    </li>
+                                </ul>
+                                <small v-if="selectedCustomer" class="text-success">{{ selectedCustomer.name }} ({{ selectedCustomer.phone_number }})</small>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">လျှော့ဈေး (MMK)</label>
+                                <input type="number" class="form-control" v-model.number="discountAmount" min="0" step="100" placeholder="0">
+                            </div>
+                            <ul class="list-group mb-4 cart-list" style="max-height: 250px; overflow-y: auto;">
+                                <li 
+                                    v-for="(item, index) in cartItems" 
+                                    :key="item.product.id"
+                                    class="list-group-item d-flex justify-content-between align-items-center"
+                                >
+                                    <div>
+                                        <strong class="d-block">{{ item.product.name }}</strong>
+                                        <small>{{ item.product.retail_price }} MMK x {{ item.quantity }}</small>
+                                    </div>
+                                    <div class="text-end">
+                                        <span class="fw-bold fs-5 me-3">{{ item.subtotal.toFixed(2) }} MMK</span>
+                                        <button class="btn btn-sm btn-outline-secondary" @click="updateCartQuantity(index, -1)">-</button>
+                                        <span class="mx-2">{{ item.quantity }}</span>
+                                        <button class="btn btn-sm btn-outline-secondary" @click="updateCartQuantity(index, 1)">+</button>
+                                        <button class="btn btn-sm btn-danger ms-2" @click="removeFromCart(index)"><i class="fas fa-trash"></i></button>
+                                    </div>
+                                </li>
+                                <li v-if="cartItems.length === 0" class="list-group-item text-center text-muted">
+                                    No items in the cart. Scan a product to start.
+                                </li>
+                            </ul>
+                            
+                            <div class="p-3 bg-light rounded shadow-sm">
+                                <div class="d-flex justify-content-between fs-5 mb-2">
+                                    <span>Subtotal:</span>
+                                    <strong>{{ cartTotal.subtotal.toFixed(2) }} MMK</strong>
+                                </div>
+                                <div v-if="discountAmount > 0" class="d-flex justify-content-between fs-5 mb-2 text-danger">
+                                    <span>လျှော့ဈေး:</span>
+                                    <strong>- {{ discountAmount.toFixed(2) }} MMK</strong>
+                                </div>
+                                <hr class="my-1">
+                                <div class="d-flex justify-content-between fs-4 text-primary">
+                                    <span>GRAND TOTAL:</span>
+                                    <strong>{{ cartTotal.grandTotal.toFixed(2) }} MMK</strong>
+                                </div>
+                            </div>
+
+                            <div class="mt-4 d-grid gap-2">
+                                <button 
+                                    class="btn btn-success btn-lg" 
+                                    @click="submitSaleRequest" 
+                                    :disabled="cartItems.length === 0 || isSubmitting"
+                                >
+                                    <span v-if="isSubmitting" class="spinner-border spinner-border-sm me-2"></span>
+                                    {{ isSubmitting ? 'Submitting...' : 'QUICK SALE (SUBMIT)' }}
+                                </button>
+                                <button class="btn btn-danger btn-lg" @click="clearCart" :disabled="cartItems.length === 0">
+                                    CANCEL TRANSACTION
+                                </button>
+                                <button v-if="lastSaleId" @click="printReceipt(lastSaleId)" class="btn btn-outline-primary btn-lg">
+                                    <i class="fas fa-print me-2"></i>Receipt ထုတ်ရန် (Admin အတည်ပြုပြီးမှ)
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endverbatim %}
+{% endblock %}
+
+{% block scripts %}
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+    
+        <script>
+            const app = Vue.createApp({
+                data() {
+                    return {
+                        products: [],
+                        cartItems: [],
+                        scanInput: '',
+                        message: '',
+                        messageType: '',
+                        isSubmitting: false,
+                        currentLocation: null,
+                        assignedLocations: [],
+                        selectedLocationId: '',
+                        selectedCustomer: null,
+                        customerSearch: '',
+                        customerSuggestions: [],
+                        customerSearchTimeout: null,
+                        discountAmount: 0,
+                        lastSaleId: null,
+                    };
+                },
+                
+                computed: {
+                    cartTotal() {
+                        const subtotal = this.cartItems.reduce((sum, item) => sum + item.subtotal, 0);
+                        const discount = this.discountAmount || 0;
+                        return {
+                            subtotal: subtotal,
+                            grandTotal: Math.max(0, subtotal - discount)
+                        };
+                    },
+                },
+
+                mounted() {
+                    this.fetchUserProfile();
+                    this.fetchProducts();
+                    this.$nextTick(() => {
+                        const el = document.querySelector('input[autofocus]');
+                        if (el) el.focus();
+                    });
+                },
+                
+                methods: {
+                    // CSRF Token ကို Django မှ ရယူခြင်း
+                    getCsrfToken() {
+                        return document.querySelector('[name=csrfmiddlewaretoken]').value;
+                    },
+                    
+                    async fetchUserProfile() {
+                        try {
+                            const res = await axios.get('/api/core/me/', {
+                                headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+                            });
+                            this.currentLocation = res.data.current_location;
+                            this.assignedLocations = res.data.assigned_locations_list || [];
+                            if (this.currentLocation) this.selectedLocationId = this.currentLocation.id;
+                        } catch (e) {
+                            console.warn('Could not fetch user profile:', e);
+                        }
+                    },
+                    async onLocationChange() {
+                        if (!this.selectedLocationId) return;
+                        try {
+                            const res = await axios.post('/api/core/select-location/', { location_id: parseInt(this.selectedLocationId) }, {
+                                headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}`, 'Content-Type': 'application/json' }
+                            });
+                            this.currentLocation = res.data.current_location;
+                            this.showMessage(res.data.message || 'ဆိုင်ရွေးချယ်ပြီးပါပြီ။', 'alert-success');
+                            this.fetchProducts();
+                        } catch (e) {
+                            this.showMessage(e.response?.data?.error || 'ဆိုင်ရွေးချယ်မှု မအောင်မြင်ပါ။', 'alert-danger');
+                        }
+                    },
+                    async fetchProducts() {
+                        try {
+                            const response = await axios.get('/api/staff/items/', {
+                                headers: {
+                                    'Authorization': `Bearer ${localStorage.getItem('access_token')}` // Token ကို သုံးဖို့ လိုအပ်ပါက
+                                }
+                            });
+                            this.products = response.data;
+                        } catch (error) {
+                            console.error('Error fetching products:', error);
+                            if (error.response && error.response.status === 401) {
+                                window.location.href = '{% url "login" %}?next=' + encodeURIComponent(window.location.pathname);
+                            } else {
+                                this.showMessage('Failed to load products.', 'alert-danger');
+                            }
+                        }
+                    },
+                    
+                    // 2. Barcode/QR Scan Logic
+                    scanProduct() {
+                        const sku = this.scanInput.trim();
+                        if (!sku) {
+                            this.showMessage('Please scan a barcode or enter an SKU.', 'alert-warning');
+                            return;
+                        }
+
+                        // Product List ထဲမှ SKU ဖြင့် ရှာဖွေခြင်း
+                        const productToAdd = this.products.find(p => p.sku === sku);
+                        
+                        if (productToAdd) {
+                            const stockQty = productToAdd.shop_stock ?? productToAdd.total_stock ?? 0;
+                            if (stockQty <= 0) {
+                                this.showMessage(`'${productToAdd.name}' is out of stock (0 Qty).`, 'alert-warning');
+                                return;
+                            }
+                            this.addProductToCart(productToAdd);
+                            this.scanInput = ''; // Add ပြီးသည်နှင့် Input ကို ရှင်းလင်းပါ
+                            this.showMessage(`'${productToAdd.name}' added to cart.`, 'alert-success', 1500);
+                        } else {
+                            this.showMessage(`Product with SKU '${sku}' not found.`, 'alert-danger');
+                        }
+                        
+                        // Input box ကို focus ပြန်ပေးပါ
+                        this.$nextTick(() => {
+                            document.querySelector('input[autofocus]').focus();
+                        });
+                    },
+                    
+                    // 3. Cart ထဲသို့ ပစ္စည်းထည့်ခြင်း
+                    addProductToCart(product) {
+                        const existingItemIndex = this.cartItems.findIndex(item => item.product.id === product.id);
+                        
+                        if (existingItemIndex > -1) {
+                            // ရှိပြီးသားဆိုရင် Qty တိုးပါ
+                            const currentItem = this.cartItems[existingItemIndex];
+                            const stockQty = product.shop_stock ?? product.total_stock ?? 0;
+                            if (currentItem.quantity < stockQty) {
+                                currentItem.quantity += 1;
+                                currentItem.subtotal = currentItem.quantity * product.retail_price;
+                            } else {
+                                this.showMessage(`Cannot add more. Max stock available: ${stockQty}`, 'alert-warning');
+                            }
+                        } else {
+                            // အသစ်ထည့်ပါ
+                            this.cartItems.push({
+                                product: product,
+                                quantity: 1,
+                                subtotal: 1 * product.retail_price,
+                            });
+                        }
+                    },
+                    
+                    // 4. Cart ထဲက ပစ္စည်းအရေအတွက် ပြောင်းလဲခြင်း
+                    updateCartQuantity(index, change) {
+                        const item = this.cartItems[index];
+                        const newQty = item.quantity + change;
+                        
+                        const stockQty = item.product.shop_stock ?? item.product.total_stock ?? 0;
+                        if (newQty > 0 && newQty <= stockQty) {
+                            item.quantity = newQty;
+                            item.subtotal = newQty * item.product.retail_price;
+                        } else if (newQty === 0) {
+                            this.removeFromCart(index);
+                        } else if (newQty > stockQty) {
+                            this.showMessage(`Cannot exceed stock limit (${stockQty}) for ${item.product.name}`, 'alert-warning');
+                        }
+                    },
+                    
+                    // 5. Cart မှ ပစ္စည်းဖယ်ရှားခြင်း
+                    removeFromCart(index) {
+                        this.cartItems.splice(index, 1);
+                    },
+                    
+                    // 6. Cart ရှင်းလင်းခြင်း
+                    clearCart() {
+                        if (confirm("Are you sure you want to cancel the entire transaction?")) {
+                            this.cartItems = [];
+                            this.showMessage('Transaction cancelled. Cart cleared.', 'alert-info');
+                        }
+                    },
+
+                    // 7. အရောင်းတောင်းဆိုမှု Submit လုပ်ခြင်း
+                    async submitSaleRequest() {
+                        if (this.cartItems.length === 0) {
+                            this.showMessage('Cart is empty. Please add products.', 'alert-warning');
+                            return;
+                        }
+
+                        this.isSubmitting = true;
+                        
+                        // API ကို တင်မယ့် Data ကို ပြင်ဆင်ခြင်း (SaleRequestSerializer format)
+                        const salesData = {
+                            customer: this.selectedCustomer ? this.selectedCustomer.id : null,
+                            discount_amount: parseFloat(this.discountAmount) || 0,
+                            sale_items: this.cartItems.map(item => ({
+                                product: item.product.id,
+                                quantity: item.quantity,
+                                unit_price: parseFloat(item.product.retail_price)
+                            }))
+                        };
+                        if (this.currentLocation && this.currentLocation.id) {
+                            salesData.sale_location = this.currentLocation.id;
+                        }
+                        
+                        try {
+                            const response = await axios.post('/api/sales/request/', salesData, {
+                                headers: {
+                                    'X-CSRFToken': this.getCsrfToken(),
+                                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`, // Token ကို သုံးဖို့ လိုအပ်ပါက
+                                    'Content-Type': 'application/json'
+                                }
+                            });
+
+                            this.lastSaleId = response.data.id;
+                            this.showMessage('အရောင်းတောင်းဆိုမှု အောင်မြင်ပါပြီ။ Invoice: ' + (response.data.invoice_number || response.data.id) + ' - Admin အတည်ပြုပြီးနောက် Receipt ထုတ်နိုင်ပါသည်။', 'alert-success', 6000);
+                            this.cartItems = [];
+                            this.selectedCustomer = null;
+                            this.discountAmount = 0;
+                            this.fetchProducts();
+                            
+                        } catch (error) {
+                            console.error('Sale Submission Error:', error.response ? error.response.data : error);
+                            
+                            let errorMessage = 'Sale submission failed.';
+                            if (error.response && error.response.data.detail) {
+                                errorMessage = error.response.data.detail;
+                            } else if (error.response && error.response.data.non_field_errors) {
+                                errorMessage = error.response.data.non_field_errors.join(', ');
+                            } else if (error.response && error.response.data.product) {
+                                // Product specific validation error (e.g., stock validation from backend)
+                                errorMessage = `Product Error: ${error.response.data.product}`;
+                            }
+                            
+                            this.showMessage(errorMessage, 'alert-danger');
+                            
+                        } finally {
+                            this.isSubmitting = false;
+                            this.$nextTick(() => {
+                                document.querySelector('input[autofocus]').focus();
+                            });
+                        }
+                    },
+                    
+                    async searchCustomers() {
+                        clearTimeout(this.customerSearchTimeout);
+                        const q = this.customerSearch.trim();
+                        if (q.length < 2) { this.customerSuggestions = []; return; }
+                        this.customerSearchTimeout = setTimeout(async () => {
+                            try {
+                                const res = await axios.get('/api/customers/?search=' + encodeURIComponent(q), {
+                                    headers: { 'Authorization': 'Bearer ' + localStorage.getItem('access_token') }
+                                });
+                                this.customerSuggestions = res.data.results || res.data || [];
+                            } catch (e) { this.customerSuggestions = []; }
+                        }, 300);
+                    },
+                    selectCustomer(c) {
+                        this.selectedCustomer = c;
+                        this.customerSuggestions = [];
+                        this.customerSearch = '';
+                    },
+                    clearCustomer() {
+                        this.selectedCustomer = null;
+                        this.customerSearch = '';
+                    },
+                    async printReceipt(saleId) {
+                        try {
+                            const res = await fetch('/api/invoice/' + saleId + '/pdf/', {
+                                headers: { 'Authorization': 'Bearer ' + localStorage.getItem('access_token') }
+                            });
+                            if (res.ok) {
+                                const blob = await res.blob();
+                                const url = URL.createObjectURL(blob);
+                                window.open(url, '_blank');
+                            } else {
+                                this.showMessage('Receipt မရနိုင်ပါ။ Admin အတည်ပြုပြီးပါသလား စစ်ဆေးပါ။', 'alert-warning');
+                            }
+                        } catch (e) {
+                            this.showMessage('Receipt ထုတ်ယူခြင်း မအောင်မြင်ပါ။', 'alert-danger');
+                        }
+                    },
+                    // 8. Message များကို ပြသခြင်း
+                    showMessage(msg, type, duration = 3000) {
+                        this.message = msg;
+                        this.messageType = type;
+                        clearTimeout(this.messageTimeout);
+                        this.messageTimeout = setTimeout(() => {
+                            this.message = '';
+                        }, duration);
+                    }
+                }
+            });
+
+            app.mount('#quick-sale-app');
+        </script>
+    
+{% endblock %}

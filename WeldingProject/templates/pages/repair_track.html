@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}စက်ပြင်ခြေရာခံမှု - HoBo POS{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="card shadow">
+            <div class="card-header bg-success text-white">
+                <h4 class="mb-0"><i class="fas fa-wrench me-2"></i>စက်ပြင်ခြေရာခံမှု</h4>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">Repair No. နှင့် ဖုန်းနံပါတ်ဖြင့် စက်ပြင်အခြေအနေ စစ်ဆေးပါ။</p>
+                
+                <form id="repair-track-form" class="mb-4">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label">Repair No.</label>
+                        <input type="text" class="form-control form-control-lg" id="repair_no" 
+                               placeholder="ဥပမာ - R-2025-001" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">ဖုန်းနံပါတ်</label>
+                        <input type="text" class="form-control form-control-lg" id="phone" 
+                               placeholder="ဥပမာ - 09123456789" required>
+                    </div>
+                    <button type="submit" class="btn btn-success btn-lg w-100" id="btn-search">
+                        <i class="fas fa-search me-2"></i>စစ်ဆေးရန်
+                    </button>
+                </form>
+
+                <div id="result-area" class="d-none">
+                    <hr>
+                    <div id="result-success" class="d-none">
+                        <div class="alert alert-success">
+                            <h5><i class="fas fa-check-circle me-2"></i>ရှာတွေ့ပါပြီ</h5>
+                        </div>
+                        <table class="table table-bordered">
+                            <tr><th style="width:40%">Repair No.</th><td id="r-repair_no"></td></tr>
+                            <tr><th>ပစ္စည်းအမည်</th><td id="r-item_name"></td></tr>
+                            <tr><th>အခြေအနေ</th><td><span id="r-status" class="badge fs-6"></span></td></tr>
+                            <tr><th>လက်ခံရက်စွဲ</th><td id="r-received_date"></td></tr>
+                            <tr><th>ပြန်ပေးမည့်ရက်</th><td id="r-return_date"></td></tr>
+                            <tr><th>ခန့်မှန်းကုန်ကျစရိတ်</th><td id="r-total_cost"></td></tr>
+                            <tr><th>လာယူမည့်ဆိုင်</th><td id="r-location"></td></tr>
+                        </table>
+                    </div>
+                    <div id="result-notfound" class="d-none">
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <span id="notfound-msg">စက်ပြင်မှတ်တမ်း ရှာမတွေ့ပါ။</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('repair-track-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const repairNo = document.getElementById('repair_no').value.trim();
+    const phone = document.getElementById('phone').value.trim().replace(/\s/g, '');
+    const btn = document.getElementById('btn-search');
+    
+    if (!repairNo || !phone) {
+        alert('Repair No. နှင့် ဖုန်းနံပါတ် ထည့်သွင်းပါ။');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>စစ်ဆေးနေပါသည်...';
+
+    try {
+        const res = await fetch('/api/service/track/?repair_no=' + encodeURIComponent(repairNo) + '&phone=' + encodeURIComponent(phone));
+        const data = await res.json();
+        
+        document.getElementById('result-area').classList.remove('d-none');
+        document.getElementById('result-success').classList.add('d-none');
+        document.getElementById('result-notfound').classList.add('d-none');
+
+        if (data.found) {
+            document.getElementById('result-success').classList.remove('d-none');
+            document.getElementById('r-repair_no').textContent = data.repair_no;
+            document.getElementById('r-item_name').textContent = data.item_name || '-';
+            document.getElementById('r-status').textContent = data.status_display || data.status;
+            document.getElementById('r-status').className = 'badge fs-6 bg-' + (data.status === 'ready' ? 'success' : data.status === 'rejected' ? 'danger' : 'primary');
+            document.getElementById('r-received_date').textContent = data.received_date || '-';
+            document.getElementById('r-return_date').textContent = data.return_date || '-';
+            document.getElementById('r-total_cost').textContent = (data.total_estimated_cost ? data.total_estimated_cost.toLocaleString() + ' MMK' : '-');
+            document.getElementById('r-location').textContent = data.location || '-';
+        } else {
+            document.getElementById('result-notfound').classList.remove('d-none');
+            document.getElementById('notfound-msg').textContent = data.message || 'စက်ပြင်မှတ်တမ်း ရှာမတွေ့ပါ။';
+        }
+    } catch (err) {
+        document.getElementById('result-area').classList.remove('d-none');
+        document.getElementById('result-success').classList.add('d-none');
+        document.getElementById('result-notfound').classList.remove('d-none');
+        document.getElementById('notfound-msg').textContent = 'အမှားတစ်ခု ဖြစ်ပေါ်ခဲ့သည်။ ထပ်ကြိုးစားပါ။';
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-search me-2"></i>စစ်ဆေးရန်';
+    }
+});
+</script>
+{% endblock %}

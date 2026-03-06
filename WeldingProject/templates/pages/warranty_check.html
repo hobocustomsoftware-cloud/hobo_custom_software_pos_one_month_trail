@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}အာမခံချက် စစ်ဆေးမှု - HoBo POS{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="card shadow">
+            <div class="card-header bg-info text-white">
+                <h4 class="mb-0"><i class="fas fa-shield-alt me-2"></i>အာမခံချက် စစ်ဆေးမှု</h4>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">ပစ္စည်း Serial Number ဖြင့် Warranty အခြေအနေ စစ်ဆေးပါ။</p>
+                
+                <form id="warranty-form" class="mb-4">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label">Serial Number</label>
+                        <input type="text" class="form-control form-control-lg" id="serial_number" 
+                               placeholder="ဥပမာ - SN123456789" required>
+                    </div>
+                    <button type="submit" class="btn btn-info btn-lg w-100" id="btn-check">
+                        <i class="fas fa-search me-2"></i>စစ်ဆေးရန်
+                    </button>
+                </form>
+
+                <div id="result-area" class="d-none">
+                    <hr>
+                    <div id="result-valid" class="d-none">
+                        <div class="alert alert-success">
+                            <h5><i class="fas fa-check-circle me-2"></i>အာမခံချက် သက်တမ်းရှိပါသည်</h5>
+                        </div>
+                        <table class="table table-bordered">
+                            <tr><th style="width:40%">Serial No.</th><td id="w-serial"></td></tr>
+                            <tr><th>ပစ္စည်းအမည်</th><td id="w-product"></td></tr>
+                            <tr><th>စတင်ရက်</th><td id="w-start"></td></tr>
+                            <tr><th>ကုန်ဆုံးရက်</th><td id="w-end"></td></tr>
+                            <tr><th>အခြေအနေ</th><td><span id="w-status" class="badge bg-success">သက်တမ်းရှိပါသည်</span></td></tr>
+                        </table>
+                    </div>
+                    <div id="result-expired" class="d-none">
+                        <div class="alert alert-warning">
+                            <h5><i class="fas fa-exclamation-triangle me-2"></i>အာမခံချက် ကုန်ဆုံးပြီး</h5>
+                        </div>
+                        <table class="table table-bordered">
+                            <tr><th style="width:40%">Serial No.</th><td id="we-serial"></td></tr>
+                            <tr><th>ပစ္စည်းအမည်</th><td id="we-product"></td></tr>
+                            <tr><th>ကုန်ဆုံးရက်</th><td id="we-end"></td></tr>
+                        </table>
+                    </div>
+                    <div id="result-notfound" class="d-none">
+                        <div class="alert alert-danger">
+                            <i class="fas fa-times-circle me-2"></i>
+                            <span id="notfound-msg">Serial Number ရှာမတွေ့ပါ။</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('warranty-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const serial = document.getElementById('serial_number').value.trim();
+    const btn = document.getElementById('btn-check');
+    
+    if (!serial) {
+        alert('Serial Number ထည့်သွင်းပါ။');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>စစ်ဆေးနေပါသည်...';
+
+    try {
+        const res = await fetch(`/api/warranty/check/?serial_number=${encodeURIComponent(serial)}`);
+        const data = await res.json();
+        
+        document.getElementById('result-area').classList.remove('d-none');
+        document.getElementById('result-valid').classList.add('d-none');
+        document.getElementById('result-expired').classList.add('d-none');
+        document.getElementById('result-notfound').classList.add('d-none');
+
+        if (data.found) {
+            if (data.is_warranty_active) {
+                document.getElementById('result-valid').classList.remove('d-none');
+                document.getElementById('w-serial').textContent = data.serial_number;
+                document.getElementById('w-product').textContent = data.product_name || '-';
+                document.getElementById('w-start').textContent = data.warranty_start_date || '-';
+                document.getElementById('w-end').textContent = data.warranty_end_date || '-';
+            } else {
+                document.getElementById('result-expired').classList.remove('d-none');
+                document.getElementById('we-serial').textContent = data.serial_number;
+                document.getElementById('we-product').textContent = data.product_name || '-';
+                document.getElementById('we-end').textContent = data.warranty_end_date || '-';
+            }
+        } else {
+            document.getElementById('result-notfound').classList.remove('d-none');
+            document.getElementById('notfound-msg').textContent = data.message || 'Serial Number ရှာမတွေ့ပါ။';
+        }
+    } catch (err) {
+        document.getElementById('result-area').classList.remove('d-none');
+        document.getElementById('result-valid').classList.add('d-none');
+        document.getElementById('result-expired').classList.add('d-none');
+        document.getElementById('result-notfound').classList.remove('d-none');
+        document.getElementById('notfound-msg').textContent = 'အမှားတစ်ခု ဖြစ်ပေါ်ခဲ့သည်။ ထပ်ကြိုးစားပါ။';
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-search me-2"></i>စစ်ဆေးရန်';
+    }
+});
+</script>
+{% endblock %}

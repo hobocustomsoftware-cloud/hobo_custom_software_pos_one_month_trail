@@ -1,0 +1,1 @@
+import t from"./InstallationDashboard-xNfQ7RZ6.js";import{q as o,v as r}from"./vue-CRUzHnhb.js";import"./vue-router-B-1_I4TW.js";import"./index-Bfk63GuZ.js";import"./pinia-DGt8G9RV.js";import"./barcode-qr-BLgyGraa.js";const f={__name:"InstallationManagement",setup(a){return(e,m)=>(r(),o(t))}};export{f as default};

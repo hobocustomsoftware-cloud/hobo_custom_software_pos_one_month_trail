@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}ဝင်ရောက်ရန် - HoBo POS{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-5">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0"><i class="fas fa-sign-in-alt me-2"></i>ဝန်ထမ်း ဝင်ရောက်ရန်</h4>
+            </div>
+            <div class="card-body">
+                <form id="login-form">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label">အသုံးပြုသူအမည်</label>
+                        <input type="text" class="form-control form-control-lg" id="username" required autofocus>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">စကားဝှက်</label>
+                        <input type="password" class="form-control form-control-lg" id="password" required>
+                    </div>
+                    <div id="login-error" class="alert alert-danger d-none mb-3"></div>
+                    <button type="submit" class="btn btn-primary btn-lg w-100" id="btn-login">
+                        <i class="fas fa-sign-in-alt me-2"></i>ဝင်ရောက်ရန်
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('login-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value;
+    const btn = document.getElementById('btn-login');
+    const errDiv = document.getElementById('login-error');
+
+    if (!username || !password) {
+        errDiv.textContent = 'အသုံးပြုသူအမည်နှင့် စကားဝှက် ထည့်သွင်းပါ။';
+        errDiv.classList.remove('d-none');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>ဝင်နေပါသည်...';
+    errDiv.classList.add('d-none');
+
+    try {
+        const res = await fetch('/api/token/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: username, password: password })
+        });
+        const data = await res.json();
+
+        if (res.ok && data.access) {
+            localStorage.setItem('access_token', data.access);
+            if (data.refresh) localStorage.setItem('refresh_token', data.refresh);
+            const next = new URLSearchParams(window.location.search).get('next') || '{% url "pos" %}';
+            window.location.href = next.startsWith('/') ? next : '/pos/';
+        } else {
+            errDiv.textContent = data.detail || data.error || 'ဝင်ရောက်မှု မအောင်မြင်ပါ။';
+            errDiv.classList.remove('d-none');
+        }
+    } catch (err) {
+        errDiv.textContent = 'အမှားတစ်ခု ဖြစ်ပေါ်ခဲ့သည်။ ထပ်ကြိုးစားပါ။';
+        errDiv.classList.remove('d-none');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-sign-in-alt me-2"></i>ဝင်ရောက်ရန်';
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,332 @@
+[
+  {
+    "day": 1,
+    "action": "Shop Registration & Setup",
+    "emoji": "🏪",
+    "timestamp": "2026-02-18T03:11:02.929802+00:00"
+  },
+  {
+    "day": 1,
+    "action": "License activated",
+    "emoji": "🔑",
+    "timestamp": "2026-02-18T03:11:03.054517+00:00"
+  },
+  {
+    "day": 1,
+    "action": "Shop settings configured",
+    "emoji": "⚙️",
+    "timestamp": "2026-02-18T03:11:03.068794+00:00"
+  },
+  {
+    "day": 1,
+    "action": "Initial USD rate: 3450.0000 MMK",
+    "emoji": "💵",
+    "timestamp": "2026-02-18T03:11:03.133164+00:00"
+  },
+  {
+    "day": 2,
+    "action": "Staff Setup - All 11 Roles",
+    "emoji": "👥",
+    "timestamp": "2026-02-18T03:11:03.139067+00:00"
+  },
+  {
+    "day": 2,
+    "action": "Created 12 staff members",
+    "emoji": "✅",
+    "timestamp": "2026-02-18T03:11:03.367640+00:00"
+  },
+  {
+    "day": 3,
+    "action": "Inventory Setup - Solar Products",
+    "emoji": "📦",
+    "timestamp": "2026-02-18T03:11:03.367728+00:00"
+  },
+  {
+    "day": 3,
+    "action": "Created 7 products, 1 bundle, 4 payment methods",
+    "emoji": "✅",
+    "timestamp": "2026-02-18T03:11:03.432528+00:00"
+  },
+  {
+    "day": 4,
+    "action": "Stock Inbound - Assigning to Main Warehouse",
+    "emoji": "📥",
+    "timestamp": "2026-02-18T03:11:03.432606+00:00"
+  },
+  {
+    "day": 4,
+    "action": "Stock inbound completed with serial numbers",
+    "emoji": "✅",
+    "timestamp": "2026-02-18T03:11:03.632529+00:00"
+  },
+  {
+    "day": 5,
+    "action": "Creating First Customers",
+    "emoji": "👥",
+    "timestamp": "2026-02-18T03:11:03.632737+00:00"
+  },
+  {
+    "day": 5,
+    "action": "Created 5 customers",
+    "emoji": "✅",
+    "timestamp": "2026-02-18T03:11:03.643419+00:00"
+  },
+  {
+    "day": 5,
+    "action": "Sale 1: Panel x2 + Battery x1",
+    "emoji": "💰",
+    "timestamp": "2026-02-18T03:11:03.643560+00:00"
+  },
+  {
+    "day": 5,
+    "action": "Sale 1 completed with serial assignment",
+    "emoji": "✅",
+    "timestamp": "2026-02-18T03:11:03.727688+00:00"
+  },
+  {
+    "day": 6,
+    "action": "Sale 2: Bundle \"3KW Home Solar System\"",
+    "emoji": "💰",
+    "timestamp": "2026-02-18T03:11:03.727768+00:00"
+  },
+  {
+    "day": 6,
+    "action": "Sale 2 completed - Bundle sold, Installation Job created",
+    "emoji": "✅",
+    "timestamp": "2026-02-18T03:11:03.871932+00:00"
+  },
+  {
+    "day": 7,
+    "action": "Sale 3: Accessories (Cash)",
+    "emoji": "💰",
+    "timestamp": "2026-02-18T03:11:03.872039+00:00"
+  },
+  {
+    "day": 7,
+    "action": "Sale 3 completed",
+    "emoji": "✅",
+    "timestamp": "2026-02-18T03:11:03.912111+00:00"
+  },
+  {
+    "day": 8,
+    "action": "USD Rate Change: 3450 -> 3520 MMK (+2%)",
+    "emoji": "💵",
+    "timestamp": "2026-02-18T03:11:03.912143+00:00"
+  },
+  {
+    "day": 8,
+    "action": "All 7 USD products repriced. Notification sent to manager.",
+    "emoji": "✅",
+    "timestamp": "2026-02-18T03:11:04.006925+00:00"
+  },
+  {
+    "day": 10,
+    "action": "Installation Week - Job 1 Progress",
+    "emoji": "🔧",
+    "timestamp": "2026-02-18T03:11:04.006995+00:00"
+  },
+  {
+    "day": 10,
+    "action": "Installation Job 1: Site Survey Completed",
+    "emoji": "🔧",
+    "timestamp": "2026-02-18T03:11:04.020600+00:00"
+  },
+  {
+    "day": 11,
+    "action": "Installation Job 1: Scheduled",
+    "emoji": "🔧",
+    "timestamp": "2026-02-18T03:11:04.022687+00:00"
+  },
+  {
+    "day": 12,
+    "action": "Installation Job 1: In Progress",
+    "emoji": "🔧",
+    "timestamp": "2026-02-18T03:11:04.025090+00:00"
+  },
+  {
+    "day": 14,
+    "action": "Installation Job 1 completed, 0 warranties synced. Installation fee recorded.",
+    "emoji": "✅",
+    "timestamp": "2026-02-18T03:11:04.049880+00:00"
+  },
+  {
+    "day": 12,
+    "action": "More Sales: Sale 4 & 5",
+    "emoji": "💰",
+    "timestamp": "2026-02-18T03:11:04.057058+00:00"
+  },
+  {
+    "day": 13,
+    "action": "Sales 4 & 5 completed",
+    "emoji": "✅",
+    "timestamp": "2026-02-18T03:11:04.122820+00:00"
+  },
+  {
+    "day": 13,
+    "action": "Sale 6: Monitoring Module (Cash, Walk-in)",
+    "emoji": "💰",
+    "timestamp": "2026-02-18T03:11:04.122857+00:00"
+  },
+  {
+    "day": 13,
+    "action": "Sale 6 completed",
+    "emoji": "✅",
+    "timestamp": "2026-02-18T03:11:04.148539+00:00"
+  },
+  {
+    "day": 15,
+    "action": "Recording Monthly Expenses",
+    "emoji": "📊",
+    "timestamp": "2026-02-18T03:11:04.148575+00:00"
+  },
+  {
+    "day": 15,
+    "action": "Recorded 4 expenses with Transaction records",
+    "emoji": "✅",
+    "timestamp": "2026-02-18T03:11:04.175405+00:00"
+  },
+  {
+    "day": 16,
+    "action": "Warranty Claim - Repair Service",
+    "emoji": "🔧",
+    "timestamp": "2026-02-18T03:11:04.175479+00:00"
+  },
+  {
+    "day": 16,
+    "action": "Warranty repair completed",
+    "emoji": "✅",
+    "timestamp": "2026-02-18T03:11:04.229388+00:00"
+  },
+  {
+    "day": 18,
+    "action": "USD Rate Drop: 3520 -> 3490 MMK",
+    "emoji": "💵",
+    "timestamp": "2026-02-18T03:11:04.229470+00:00"
+  },
+  {
+    "day": 18,
+    "action": "Products repriced again. Notification sent to manager.",
+    "emoji": "✅",
+    "timestamp": "2026-02-18T03:11:04.312268+00:00"
+  },
+  {
+    "day": 19,
+    "action": "Stock Transfer: Warehouse -> Shop Floor",
+    "emoji": "📦",
+    "timestamp": "2026-02-18T03:11:04.312342+00:00"
+  },
+  {
+    "day": 20,
+    "action": "Stock transfer completed",
+    "emoji": "✅",
+    "timestamp": "2026-02-18T03:11:04.365836+00:00"
+  },
+  {
+    "day": 21,
+    "action": "More Sales: Sales 7-10",
+    "emoji": "💰",
+    "timestamp": "2026-02-18T03:11:04.365916+00:00"
+  },
+  {
+    "day": 23,
+    "action": "Repair 2: Out of Warranty (Walk-in)",
+    "emoji": "🔧",
+    "timestamp": "2026-02-18T03:11:04.437916+00:00"
+  },
+  {
+    "day": 25,
+    "action": "Sales 7-10 and Repair 2 completed",
+    "emoji": "✅",
+    "timestamp": "2026-02-18T03:11:04.457450+00:00"
+  },
+  {
+    "day": 26,
+    "action": "Second Installation Job",
+    "emoji": "🔧",
+    "timestamp": "2026-02-18T03:11:04.457495+00:00"
+  },
+  {
+    "day": 28,
+    "action": "Installation Job 2 completed",
+    "emoji": "✅",
+    "timestamp": "2026-02-18T03:11:04.531921+00:00"
+  },
+  {
+    "day": 29,
+    "action": "Month End: Generating Reports",
+    "emoji": "📊",
+    "timestamp": "2026-02-18T03:11:04.531955+00:00"
+  },
+  {
+    "day": 29,
+    "action": "  Net Profit: 107,184,760 MMK",
+    "emoji": "   ",
+    "timestamp": "2026-02-18T03:11:04.720172+00:00"
+  },
+  {
+    "day": 29,
+    "action": "  Gross Profit: 16,137,588 MMK",
+    "emoji": "   ",
+    "timestamp": "2026-02-18T03:11:04.720249+00:00"
+  },
+  {
+    "day": 30,
+    "action": "AI Insights: Triggering smart business insights",
+    "emoji": "🤖",
+    "timestamp": "2026-02-18T03:11:04.720404+00:00"
+  },
+  {
+    "day": 30,
+    "action": "  AI Insights endpoint: GET /api/ai/insights/",
+    "emoji": "   ",
+    "timestamp": "2026-02-18T03:11:04.720462+00:00"
+  },
+  {
+    "day": 30,
+    "action": "  Best Sellers endpoint: GET /api/ai/best-sellers/",
+    "emoji": "   ",
+    "timestamp": "2026-02-18T03:11:04.720478+00:00"
+  },
+  {
+    "day": 30,
+    "action": "  Sale Tips endpoint: GET /api/ai/sale-auto-tips/",
+    "emoji": "   ",
+    "timestamp": "2026-02-18T03:11:04.720489+00:00"
+  },
+  {
+    "day": 30,
+    "action": "Month End Summary:",
+    "emoji": "📊",
+    "timestamp": "2026-02-18T03:11:04.765047+00:00"
+  },
+  {
+    "day": 30,
+    "action": "  Sales: 33 transactions, 73,931,988 MMK",
+    "emoji": "   ",
+    "timestamp": "2026-02-18T03:11:04.765083+00:00"
+  },
+  {
+    "day": 30,
+    "action": "  Repairs: 4",
+    "emoji": "   ",
+    "timestamp": "2026-02-18T03:11:04.765095+00:00"
+  },
+  {
+    "day": 30,
+    "action": "  Installations: 4",
+    "emoji": "   ",
+    "timestamp": "2026-02-18T03:11:04.765105+00:00"
+  },
+  {
+    "day": 30,
+    "action": "  New Customers: 5",
+    "emoji": "   ",
+    "timestamp": "2026-02-18T03:11:04.765114+00:00"
+  },
+  {
+    "day": 30,
+    "action": "  Low Stock Items: 5",
+    "emoji": "   ",
+    "timestamp": "2026-02-18T03:11:04.765124+00:00"
+  }
+]
