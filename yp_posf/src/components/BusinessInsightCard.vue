@@ -1,5 +1,5 @@
 <template>
-  <div class="dashboard-card p-4 min-w-0 overflow-hidden">
+  <div class="dashboard-card p-4 min-w-0 overflow-hidden min-h-[300px] flex flex-col">
     <div class="flex items-center justify-between mb-4">
       <h3 class="text-lg font-bold text-[var(--color-fg)] flex items-center gap-2">
         <span class="text-2xl">📊</span>
@@ -14,7 +14,7 @@
       </button>
     </div>
 
-    <div v-if="loading" class="text-center py-8 text-[var(--color-fg-muted)]">
+    <div v-if="loading" class="flex-1 flex items-center justify-center text-center py-8 text-[var(--color-fg-muted)]">
       Analyzing exchange rate trends...
     </div>
 
@@ -80,7 +80,7 @@
       </div>
     </div>
 
-    <div v-else class="text-center py-8 text-[var(--color-fg-muted)]">
+    <div v-else class="flex-1 flex items-center justify-center text-center py-8 text-[var(--color-fg-muted)]">
       No insights available. Ensure exchange rate data is logged.
     </div>
   </div>

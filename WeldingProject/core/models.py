@@ -19,6 +19,11 @@ class Outlet(models.Model):
     is_main_branch = models.BooleanField(default=False, verbose_name="Main Branch")
     code = models.CharField(max_length=50, blank=True, null=True, unique=True, verbose_name="Code")
     is_active = models.BooleanField(default=True)
+    # Shared demo server: isolate data per shop (ShopSettings = tenant)
+    shop = models.ForeignKey(
+        'ShopSettings', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='outlets', verbose_name="Shop (tenant)"
+    )
     parent_outlet = models.ForeignKey(
         'self', on_delete=models.CASCADE, null=True, blank=True, related_name='sub_outlets',
         verbose_name="ဆိုင်ချုပ် (Parent)", help_text="null = ဆိုင်ချုပ်၊ set = ဒီဆိုင်ချုပ်ရဲ့ ဆိုင်ခွဲ"
@@ -100,6 +105,11 @@ class User(AbstractUser):
     primary_outlet = models.ForeignKey(
         Outlet, on_delete=models.SET_NULL, null=True, blank=True,
         related_name='staff', help_text="Branch lock: staff see only this outlet. Owner: null = all outlets."
+    )
+    # Shared demo server: link user to a shop (ShopSettings = tenant) so ViewSets can filter by request.user.shop
+    shop = models.ForeignKey(
+        'ShopSettings', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='users', verbose_name="Shop (tenant)"
     )
 
     # Custom Manager ကို ပြန်လည်သတ်မှတ်ပေးရန် (AbstractUser သုံးလျှင် လိုအပ်ပါသည်)

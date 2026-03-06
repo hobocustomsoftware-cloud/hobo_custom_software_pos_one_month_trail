@@ -256,7 +256,15 @@ class RegisterSerializer(serializers.ModelSerializer):
         if not shop_name:
             raise serializers.ValidationError({'shop_name': ['Shop name is required.']})
 
-        # ၁။ ဒီ User အတွက် Outlet (ဆိုင်) အသစ် တစ်ခု ဖန်တီးပါ။ code ထူးခြားရမယ် (no phone slicing).
+        # ၁။ Shared demo server: one ShopSettings (tenant) per registration; link outlet and user to it.
+        is_first_user = not User.objects.exists()
+        if is_first_user:
+            shop, _ = ShopSettings.objects.get_or_create(
+                pk=1, defaults={'shop_name': shop_name or 'HoBo POS'}
+            )
+        else:
+            shop = ShopSettings.objects.create(shop_name=shop_name or 'HoBo POS')
+        # ၂။ ဒီ User အတွက် Outlet (ဆိုင်) အသစ် တစ်ခု ဖန်တီးပါ။ code ထူးခြားရမယ် (no phone slicing).
         import uuid
         outlet_code = f"REG_{uuid.uuid4().hex[:10]}"
         new_outlet = Outlet.objects.create(
@@ -265,10 +273,11 @@ class RegisterSerializer(serializers.ModelSerializer):
             is_main_branch=True,
             parent_outlet=None,
             is_active=True,
+            shop=shop,
         )
         # Signal က Warehouse + Shopfloor locations ဖန်တီးပေးမယ်။
 
-        # ၂။ super_admin or OWNER Role ယူပြီး user.role_obj သတ်မှတ်ပါ (user.role ကို မသတ်မှတ်ပါ – read-only property).
+        # ၃။ super_admin or OWNER Role ယူပြီး user.role_obj သတ်မှတ်ပါ (user.role ကို မသတ်မှတ်ပါ – read-only property).
         owner_role = (
             Role.objects.filter(name__iexact='super_admin').first()
             or Role.objects.filter(name__iexact='OWNER').first()
@@ -295,6 +304,7 @@ class RegisterSerializer(serializers.ModelSerializer):
                 is_active=True,
                 is_staff=True,
                 primary_outlet=new_outlet,
+                shop=shop,
             )
         except IntegrityError as e:
             err = str(e).lower()
@@ -307,14 +317,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         user.set_password(password)
         user.save()
 
-        is_first_user = User.objects.count() == 1
-        if is_first_user:
-            ShopSettings.objects.update_or_create(
-                pk=1,
-                defaults={'shop_name': shop_name or 'HoBo POS'},
-            )
-
-        # ၃။ Base units (ခု၊ လုံး၊ ချောင်း) နှင့် business category units ထည့်ပါ (every new shop).
+        # ၄။ Base units (ခု၊ လုံး၊ ချောင်း) နှင့် business category units ထည့်ပါ (every new shop).
         try:
             from django.core.management import call_command
             call_command('seed_base_units')

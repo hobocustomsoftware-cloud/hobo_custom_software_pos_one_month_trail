@@ -37,7 +37,7 @@ from core.permissions import (
     is_cashier_role,
 )
 from core.audit import log_audit
-from core.outlet_utils import filter_queryset_by_outlet, is_owner, get_request_outlet_id, user_can_access_location
+from core.outlet_utils import filter_queryset_by_outlet, is_owner, get_request_outlet_id, get_shop_outlet_ids, user_can_access_location
 from rest_framework import serializers
 import time
 import random
@@ -61,14 +61,35 @@ def _parse_quantity(val, default=1):
 # 1. Category ViewSet
 # ----------------------------------------------------
 class CategoryViewSet(viewsets.ModelViewSet):
-    """Categories: list/retrieve = Cashier+ (POS dropdown), create/update/delete = Inventory Manager+."""
-    queryset = Category.objects.all().order_by('name')
+    """Categories: list/retrieve = Cashier+ (POS dropdown), create/update/delete = Inventory Manager+.
+    Strict multi-tenant: only categories that have products with inventory in the user's outlet(s).
+    """
     serializer_class = CategorySerializer
     permission_classes = [IsInventoryManagerOrHigher]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['name']
     ordering_fields = ['name', 'id']
     ordering = ['name']
+
+    def get_queryset(self):
+        qs = Category.objects.all().order_by('name')
+        shop_outlet_ids = get_shop_outlet_ids(self.request)
+        if shop_outlet_ids is not None:
+            if not shop_outlet_ids:
+                return qs.none()
+            qs = qs.filter(
+                Q(products__inventorymovement_set__to_location__outlet_id__in=shop_outlet_ids)
+                | Q(products__inventorymovement_set__from_location__outlet_id__in=shop_outlet_ids)
+            ).distinct()
+        outlet_id = get_request_outlet_id(self.request)
+        if outlet_id is not None:
+            qs = qs.filter(
+                Q(products__inventorymovement_set__to_location__outlet_id=outlet_id)
+                | Q(products__inventorymovement_set__from_location__outlet_id=outlet_id)
+            ).distinct()
+        elif not is_owner(self.request.user):
+            qs = qs.none()
+        return qs
 
     def get_permissions(self):
         if self.action in ('list', 'retrieve'):
@@ -139,14 +160,35 @@ class ProductListAPIView(generics.ListAPIView):
         return context
 
 class ProductViewSet(viewsets.ModelViewSet):
-    """Inventory products with server-side pagination (PAGE_SIZE from settings)."""
-    queryset = Product.objects.all().select_related('category', 'base_unit', 'purchase_unit').order_by('name')
+    """Inventory products with server-side pagination (PAGE_SIZE from settings).
+    Strict multi-tenant: only products that have inventory movements in the user's outlet(s).
+    """
     serializer_class = ProductSerializer
     permission_classes = [IsAdminOrHigher]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['name', 'sku', 'model_no', 'category__name']
     ordering_fields = ['name', 'sku', 'retail_price', 'cost_price', 'created_at']
     ordering = ['name']
+
+    def get_queryset(self):
+        qs = Product.objects.all().select_related('category', 'base_unit', 'purchase_unit').order_by('name')
+        shop_outlet_ids = get_shop_outlet_ids(self.request)
+        if shop_outlet_ids is not None:
+            if not shop_outlet_ids:
+                return qs.none()
+            qs = qs.filter(
+                Q(inventorymovement_set__to_location__outlet_id__in=shop_outlet_ids)
+                | Q(inventorymovement_set__from_location__outlet_id__in=shop_outlet_ids)
+            ).distinct()
+        outlet_id = get_request_outlet_id(self.request)
+        if outlet_id is not None:
+            qs = qs.filter(
+                Q(inventorymovement_set__to_location__outlet_id=outlet_id)
+                | Q(inventorymovement_set__from_location__outlet_id=outlet_id)
+            ).distinct()
+        elif not is_owner(self.request.user):
+            qs = qs.none()
+        return qs
 
 
 class ProductLookupBySkuView(APIView):
@@ -1822,6 +1864,7 @@ class SiteViewSet(viewsets.ModelViewSet):
 
 
 class LocationViewSet(viewsets.ModelViewSet):
+    """Strict multi-tenant: locations are always filtered by the user's outlet. Users never see or delete other shops' locations."""
     serializer_class = LocationSerializer
     permission_classes = [IsAdminOrHigher]
     pagination_class = None
@@ -1833,13 +1876,7 @@ class LocationViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = Location.objects.all().order_by('name').select_related('site', 'outlet').prefetch_related('staff_assigned')
-        from core.outlet_utils import get_request_outlet_id, is_owner
-        outlet_id = get_request_outlet_id(self.request)
-        if outlet_id is not None:
-            qs = qs.filter(outlet_id=outlet_id)
-        elif not is_owner(self.request.user):
-            qs = qs.none()
-        return qs
+        return filter_queryset_by_outlet(qs, self.request, outlet_field='outlet_id')
 
 
 class LocationListAPIView(generics.ListAPIView):
@@ -1849,14 +1886,23 @@ class LocationListAPIView(generics.ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
+        qs = Location.objects.all().select_related('outlet', 'site').order_by('name')
+        shop_outlet_ids = get_shop_outlet_ids(self.request)
+        if shop_outlet_ids is not None:
+            if not shop_outlet_ids:
+                return Location.objects.none()
+            qs = qs.filter(outlet_id__in=shop_outlet_ids)
         from core.outlet_utils import is_owner
         if is_owner(user):
-            return Location.objects.all().select_related('outlet', 'site').order_by('name')
+            return qs
         outlet_id = getattr(user, 'primary_outlet_id', None)
         if outlet_id is not None:
-            return Location.objects.filter(outlet_id=outlet_id).select_related('outlet', 'site').order_by('name')
+            return qs.filter(outlet_id=outlet_id)
         if hasattr(user, 'assigned_locations'):
-            return user.assigned_locations.all().select_related('outlet', 'site').order_by('name')
+            locs = user.assigned_locations.all().select_related('outlet', 'site').order_by('name')
+            if shop_outlet_ids is not None:
+                locs = locs.filter(outlet_id__in=shop_outlet_ids)
+            return locs
         return Location.objects.none()
 
 class StaffSalesSummaryView(APIView):

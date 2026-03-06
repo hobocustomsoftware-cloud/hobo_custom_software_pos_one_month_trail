@@ -71,11 +71,18 @@ class RegisterView(generics.CreateAPIView):
 
 
 class RoleViewSet(viewsets.ModelViewSet):
-    """Owner စိတ်ကြိုက် Role များ CRUD လုပ်ရန် API – Admin+ only."""
-    queryset = Role.objects.all().order_by('id')
+    """Owner စိတ်ကြိုက် Role များ CRUD လုပ်ရန် API – Admin+ only. Shared demo: filter by request.user.shop."""
     serializer_class = RoleSerializer
     permission_classes = [IsAdminOrHigher]
     pagination_class = None
+
+    def get_queryset(self):
+        qs = Role.objects.all().order_by('id')
+        shop_id = getattr(self.request.user, 'shop_id', None)
+        if shop_id is not None:
+            qs = qs.filter(users__shop_id=shop_id).distinct()
+        return qs
+
 
 class UserDetailView(generics.RetrieveAPIView):
     """လက်ရှိ Login ဝင်ထားသူ၏ Profile ကို ပြန်ပေးမည်"""
@@ -86,23 +93,25 @@ class UserDetailView(generics.RetrieveAPIView):
         return self.request.user
 
 class EmployeeViewSet(viewsets.ModelViewSet):
-    """User အားလုံးကို စီမံခန့်ခွဲရန် (Owner Only). List/Create/Update/Delete."""
-    queryset = User.objects.all()
+    """User အားလုံးကို စီမံခန့်ခွဲရန် (Owner Only). Shared demo: filter by request.user.shop."""
     serializer_class = EmployeeSerializer
     permission_classes = [IsAdminOrHigher]
     pagination_class = None
 
     def get_queryset(self):
-        return User.objects.select_related(
-            'role_obj', 'primary_outlet', 'primary_location'
+        qs = User.objects.select_related(
+            'role_obj', 'primary_outlet', 'primary_location', 'shop'
         ).prefetch_related(
             'assigned_locations', 'work_sessions'
-        ).all()
+        )
+        shop_id = getattr(self.request.user, 'shop_id', None)
+        if shop_id is not None:
+            qs = qs.filter(shop_id=shop_id)
+        return qs
 
 
 class ShiftViewSet(viewsets.ModelViewSet):
-    """Shift (အလုပ်ချိန်) CRUD – Manager+."""
-    queryset = Shift.objects.all().order_by('start_time')
+    """Shift (အလုပ်ချိန်) CRUD – Manager+. Shared demo: no shop on Shift; visible to all in same app."""
     serializer_class = ShiftSerializer
     permission_classes = [IsAuthenticated]
     pagination_class = None

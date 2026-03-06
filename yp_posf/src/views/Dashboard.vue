@@ -17,9 +17,11 @@
       </select>
     </div>
 
-    <div class="grid grid-cols-12 gap-4 sm:gap-5">
+    <!-- Responsive grid: 1 col mobile, 2 cols md, 4 cols lg. Cards/charts keep aspect and do not overlap. -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+      <!-- Row 1: KPI cards (each 1 unit on lg) -->
       <!-- Total Revenue (Daily ရွေးထားရင် ထိုနေ့ရဲ့ စုစုပေါင်း ဝင်ငွေပဲ ပြမည်) -->
-      <div class="dashboard-card col-span-12 md:col-span-6 lg:col-span-3 p-5 min-w-0 overflow-hidden">
+      <div class="dashboard-card p-5 min-w-0 overflow-hidden">
         <p class="text-sm font-medium text-[var(--color-fg-muted)] mb-1">
           {{ selectedTimeFilter === 'Daily' ? 'ဒီနေ့ စုစုပေါင်း ဝင်ငွေ / Today\'s Revenue' : 'Total Revenue' }}
         </p>
@@ -28,7 +30,7 @@
       </div>
 
       <!-- USD Rate (Settings မှာ ပြမည်/မပြမည် ဖွင့်ပိတ်လို့ရသည်) -->
-      <div v-if="posFeatures.showUsdRate" class="dashboard-card col-span-12 md:col-span-6 lg:col-span-3 p-5 min-w-0 overflow-hidden">
+      <div v-if="posFeatures.showUsdRate" class="dashboard-card p-5 min-w-0 overflow-hidden">
         <div class="flex items-center justify-between mb-1">
           <p class="text-sm font-medium text-[var(--color-fg-muted)]">USD Rate</p>
           <span class="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 uppercase tracking-wider">
@@ -45,7 +47,7 @@
 
       <!-- P&L quick -->
       <div
-        class="dashboard-card col-span-12 md:col-span-6 lg:col-span-3 p-5 min-w-0 flex items-center gap-3 cursor-pointer hover:border-[var(--color-primary)]/50 active:scale-[0.99]"
+        class="dashboard-card p-5 min-w-0 flex items-center gap-3 cursor-pointer hover:border-[var(--color-primary)]/50 active:scale-[0.99]"
         @click="router.push('/accounting/pl')"
       >
         <div class="min-w-[48px] min-h-[48px] rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center shrink-0">
@@ -57,9 +59,9 @@
         </div>
       </div>
 
-      <!-- ဒီနေ့ အရောင်း / P&L — အချိန်နဲ့အမျှ ပြမည် (Owner + Cashier နှစ်ဦးစလုံး) -->
+      <!-- ဒီနေ့ အရောင်း / P&L -->
       <div
-        class="dashboard-card col-span-12 md:col-span-6 lg:col-span-3 p-5 min-w-0 cursor-pointer hover:border-[var(--color-primary)]/50 active:scale-[0.99]"
+        class="dashboard-card p-5 min-w-0 cursor-pointer hover:border-[var(--color-primary)]/50 active:scale-[0.99]"
         @click="router.push('/accounting/pl')"
       >
         <h3 class="text-sm font-medium text-[var(--color-fg-muted)] mb-3">ဒီနေ့အရောင်း / P&L</h3>
@@ -71,10 +73,11 @@
         </div>
       </div>
 
+      <!-- Row 2: Charts (2 cols on lg, fixed aspect so they don't overlap) -->
       <!-- Sales Graph -->
-      <div class="dashboard-card col-span-12 md:col-span-6 p-5 min-w-0 overflow-hidden">
+      <div class="dashboard-card p-5 min-w-0 overflow-hidden md:col-span-2">
         <h3 class="text-sm font-medium text-[var(--color-fg-muted)] mb-4">Sales Analytics</h3>
-        <div class="h-[120px] w-full flex items-end gap-0.5 rounded overflow-hidden bg-[var(--color-bg-light)]">
+        <div class="min-h-[140px] w-full flex items-end gap-0.5 rounded overflow-hidden bg-[var(--color-bg-light)]" style="aspect-ratio: 2/1;">
           <div
             v-for="(v, i) in salesTrendData"
             :key="i"
@@ -86,10 +89,10 @@
         <p class="text-xs text-[var(--color-fg-muted)] mt-2 uppercase tracking-wider">Last 7 periods</p>
       </div>
 
-      <!-- P&L by Outlet (Owner only: chart from pl_by_outlet) -->
-      <div v-if="plByOutlet.length > 0" class="dashboard-card col-span-12 md:col-span-6 p-5 min-w-0 overflow-hidden">
+      <!-- P&L by Outlet (Owner only) -->
+      <div v-if="plByOutlet.length > 0" class="dashboard-card p-5 min-w-0 overflow-hidden md:col-span-2">
         <h3 class="text-sm font-medium text-[var(--color-fg-muted)] mb-4">ဆိုင်အလိုက် P&L / P&L by Outlet</h3>
-        <div class="h-[140px] w-full flex items-end gap-1 rounded overflow-hidden bg-[var(--color-bg-light)]">
+        <div class="min-h-[140px] w-full flex items-end gap-1 rounded overflow-hidden bg-[var(--color-bg-light)]" style="aspect-ratio: 2/1;">
           <div
             v-for="(o, i) in plByOutlet"
             :key="o.outlet_name || i"
@@ -107,10 +110,14 @@
         <p class="text-xs text-[var(--color-fg-muted)] mt-2">Net profit by outlet (ဆိုင်အလိုက် အမြတ်အစွန်း)</p>
       </div>
 
-      <!-- Installation Jobs: Settings ထဲမှာ တပ်ဆင်မှု ဖွင့်ထားမှသာ ပြ (role အားလုံးမှာ Settings အလိုက်) -->
+      <!-- Placeholder when P&L by Outlet is hidden: keep grid alignment -->
+      <div v-else class="hidden md:block md:col-span-2" aria-hidden="true"></div>
+
+      <!-- Row 3: Feature cards (1 unit each on lg) -->
+      <!-- Installation Jobs -->
       <div
         v-if="featureToggles.enable_installation && !businessType.isPharmacyMode"
-        class="dashboard-card col-span-12 md:col-span-6 lg:col-span-3 p-5 min-w-0 flex items-center gap-3 cursor-pointer hover:border-[var(--color-primary)]/50 active:scale-[0.99]"
+        class="dashboard-card p-5 min-w-0 flex items-center gap-3 cursor-pointer hover:border-[var(--color-primary)]/50 active:scale-[0.99]"
         @click="router.push('/installation/dashboard')"
       >
         <div class="min-w-[48px] min-h-[48px] rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
@@ -121,10 +128,10 @@
           <p class="text-lg font-bold text-[var(--color-fg)] truncate">{{ installationJobsCount }}</p>
         </div>
       </div>
-      <!-- ကုသမှုများ: ဆေးဆိုင် + Settings မှာ Treatment Records ဖွင့်ထားမှ ပြ -->
+      <!-- ကုသမှုများ -->
       <div
         v-else-if="featureToggles.enable_treatment_records && businessType.isPharmacyMode"
-        class="dashboard-card col-span-12 md:col-span-6 lg:col-span-3 p-5 min-w-0 flex items-center gap-3 cursor-pointer hover:border-[var(--color-primary)]/50 active:scale-[0.99]"
+        class="dashboard-card p-5 min-w-0 flex items-center gap-3 cursor-pointer hover:border-[var(--color-primary)]/50 active:scale-[0.99]"
         @click="router.push('/treatment-records')"
       >
         <div class="min-w-[48px] min-h-[48px] rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
@@ -138,7 +145,7 @@
 
       <!-- Low Stock -->
       <div
-        class="dashboard-card col-span-12 md:col-span-6 lg:col-span-3 p-5 min-w-0 flex items-center gap-3 cursor-pointer hover:border-amber-300 active:scale-[0.99]"
+        class="dashboard-card p-5 min-w-0 flex items-center gap-3 cursor-pointer hover:border-amber-300 active:scale-[0.99]"
         @click="router.push('/reports/inventory')"
       >
         <div class="min-w-[48px] min-h-[48px] rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center shrink-0">
@@ -150,8 +157,8 @@
         </div>
       </div>
 
-      <!-- Active Services: Settings မှာ စက်ပြင်ဝန်ဆောင်မှု ဖွင့်ထားမှသာ ပြ (ဖြုတ်လို့ရသည်) -->
-      <div v-if="featureToggles.enable_service && !businessType.isPharmacyMode" class="dashboard-card col-span-12 md:col-span-6 lg:col-span-3 p-5 min-w-0 flex items-center gap-3">
+      <!-- Active Services -->
+      <div v-if="featureToggles.enable_service && !businessType.isPharmacyMode" class="dashboard-card p-5 min-w-0 flex items-center gap-3">
         <div class="min-w-[48px] min-h-[48px] rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
           <Package class="w-5 h-5 text-slate-600" :stroke-width="1.5" />
         </div>
@@ -161,20 +168,16 @@
         </div>
       </div>
 
-      <!-- AI Business Insights -->
-      <div class="col-span-12 min-w-0 overflow-hidden">
+      <!-- Row 4: Business Insights + Stock Predictions — aligned, same min-height when no data -->
+      <div class="md:col-span-2 min-w-0 overflow-hidden min-h-[320px]">
         <BusinessInsightCard />
       </div>
-
-      <!-- Stock Predictions -->
-      <div class="dashboard-card col-span-12 min-w-0 overflow-hidden">
-        <div class="p-5">
-          <StockPredictionCard />
-        </div>
+      <div class="md:col-span-2 min-w-0 overflow-hidden min-h-[320px]">
+        <StockPredictionCard />
       </div>
 
-      <!-- Smart Business Insight -->
-      <div class="dashboard-card col-span-12 lg:col-span-6 p-5 min-w-0 overflow-hidden">
+      <!-- Row 5: Smart Business Insight + Recent Transactions (2 cols on lg) -->
+      <div class="dashboard-card md:col-span-2 p-5 min-w-0 overflow-hidden">
         <h3 class="text-sm font-medium text-[var(--color-fg-muted)] mb-3 flex items-center gap-2">
           <span class="p-2 rounded-lg bg-amber-50 border border-amber-200 min-w-[40px] min-h-[40px] flex items-center justify-center">
             <TrendingUp class="w-4 h-4 text-amber-600 shrink-0" :stroke-width="1.5" />
@@ -191,7 +194,7 @@
       </div>
 
       <!-- Recent Transactions -->
-      <div class="dashboard-card col-span-12 lg:col-span-6 min-w-0 overflow-hidden flex flex-col">
+      <div class="dashboard-card md:col-span-2 min-w-0 overflow-hidden flex flex-col">
         <div class="p-4 border-b border-[var(--color-border)] flex flex-wrap justify-between items-center gap-3">
           <h3 class="text-sm font-medium text-[var(--color-fg-muted)]">Recent Transactions</h3>
           <div class="relative min-w-0 flex-1 sm:flex-initial sm:min-w-[160px]">

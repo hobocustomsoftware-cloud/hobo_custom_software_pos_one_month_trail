@@ -1,5 +1,5 @@
 <template>
-  <div class="bg-white p-5 rounded-2xl border border-[var(--color-border)] shadow-sm">
+  <div class="bg-white p-5 rounded-2xl border border-[var(--color-border)] shadow-sm min-h-[300px] flex flex-col min-w-0 overflow-hidden">
     <div class="flex items-center justify-between mb-4">
       <div>
         <h3 class="text-lg font-bold text-[var(--color-fg)] flex items-center gap-2">
@@ -17,7 +17,7 @@
       </button>
     </div>
 
-    <div v-if="loading" class="text-center py-8 text-[var(--color-fg-muted)]">
+    <div v-if="loading" class="flex-1 flex items-center justify-center text-center py-8 text-[var(--color-fg-muted)]">
       Analyzing stock movements...
     </div>
 
@@ -77,7 +77,7 @@
       </div>
     </div>
 
-    <div v-else class="text-center py-8 text-[var(--color-fg-muted)]">
+    <div v-else class="flex-1 flex items-center justify-center text-center py-8 text-[var(--color-fg-muted)]">
       No predictions available. Need more movement data.
     </div>
 

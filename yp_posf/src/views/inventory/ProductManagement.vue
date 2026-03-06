@@ -59,11 +59,39 @@
         <span class="text-[var(--color-fg)]">{{ value ? String(value).slice(0, 10) : '—' }}</span>
       </template>
       <template #actions="{ row }">
-        <div class="flex items-center justify-end gap-2">
-          <button @click="printBarcode(row)" class="text-emerald-600 font-medium text-sm hover:underline">PRINT</button>
-          <button @click="cloneProduct(row)" class="text-amber-600 font-medium text-sm hover:underline">CLONE</button>
-          <button @click="openEditModal(row)" class="text-[var(--loyverse-blue)] font-medium text-sm hover:underline">EDIT</button>
-          <button @click="deleteProduct(row.id)" class="text-rose-600 font-medium text-sm hover:underline">DELETE</button>
+        <div class="flex items-center justify-end gap-1.5 flex-wrap">
+          <button
+            type="button"
+            @click="printBarcode(row)"
+            class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 font-medium text-sm transition-colors"
+          >
+            <Printer class="w-4 h-4 shrink-0" />
+            <span>PRINT</span>
+          </button>
+          <button
+            type="button"
+            @click="cloneProduct(row)"
+            class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-amber-600 hover:bg-amber-50 font-medium text-sm transition-colors"
+          >
+            <Copy class="w-4 h-4 shrink-0" />
+            <span>CLONE</span>
+          </button>
+          <button
+            type="button"
+            @click="openEditModal(row)"
+            class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-blue-600 hover:bg-blue-50 font-medium text-sm transition-colors"
+          >
+            <Pencil class="w-4 h-4 shrink-0" />
+            <span>EDIT</span>
+          </button>
+          <button
+            type="button"
+            @click="deleteProduct(row.id)"
+            class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-red-600 hover:bg-red-50 font-medium text-sm transition-colors"
+          >
+            <Trash2 class="w-4 h-4 shrink-0" />
+            <span>DELETE</span>
+          </button>
         </div>
       </template>
     </FilterDataTable>
@@ -315,7 +343,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, computed } from 'vue'
-import { CheckCircle2, XCircle, ScanLine, Plus, Printer } from 'lucide-vue-next'
+import { CheckCircle2, XCircle, ScanLine, Plus, Printer, Pencil, Trash2, Copy } from 'lucide-vue-next'
 
 defineProps({
   /** When true, hide page title and action buttons (for use inside Item List tabs) */

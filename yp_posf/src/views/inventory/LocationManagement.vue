@@ -30,9 +30,23 @@
         <div class="px-6 py-4 bg-[var(--color-bg-card)] border-b border-[var(--color-border)] flex justify-between items-center">
           <span class="font-bold text-[#1a1a1a]">{{ site.name }}</span>
           <span class="text-sm text-[#6b7280]">{{ site.locations_count }} နေရာ</span>
-          <div class="flex gap-2">
-            <button @click="editSite(site)" class="text-[#1078D1] font-semibold text-sm hover:underline">ပြင်မည်</button>
-            <button @click="deleteSite(site.id)" class="text-rose-600 font-semibold text-sm hover:underline">ဖျက်မည်</button>
+          <div class="flex items-center gap-1.5">
+            <button
+              type="button"
+              @click="editSite(site)"
+              class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-blue-600 hover:bg-blue-50 font-semibold text-sm transition-colors"
+            >
+              <Pencil class="w-4 h-4 shrink-0" />
+              <span>ပြင်မည်</span>
+            </button>
+            <button
+              type="button"
+              @click="deleteSite(site.id)"
+              class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-red-600 hover:bg-red-50 font-semibold text-sm transition-colors"
+            >
+              <Trash2 class="w-4 h-4 shrink-0" />
+              <span>ဖျက်မည်</span>
+            </button>
           </div>
         </div>
         <div class="divide-y divide-[var(--color-border)]">
@@ -50,9 +64,23 @@
                 {{ loc.is_sale_location ? 'ရောင်းချရန်' : 'ဂိုထောင်' }}
               </span>
             </div>
-            <div class="flex gap-2">
-              <button @click="editLocation(loc)" class="text-[#1078D1] font-semibold text-sm hover:underline">ပြင်မည်</button>
-              <button @click="deleteLocation(loc.id)" class="text-rose-600 font-semibold text-sm hover:underline">ဖျက်မည်</button>
+            <div class="flex items-center gap-1.5">
+              <button
+                type="button"
+                @click="editLocation(loc)"
+                class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-blue-600 hover:bg-blue-50 font-semibold text-sm transition-colors"
+              >
+                <Pencil class="w-4 h-4 shrink-0" />
+                <span>ပြင်မည်</span>
+              </button>
+              <button
+                type="button"
+                @click="deleteLocation(loc.id)"
+                class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-red-600 hover:bg-red-50 font-semibold text-sm transition-colors"
+              >
+                <Trash2 class="w-4 h-4 shrink-0" />
+                <span>ဖျက်မည်</span>
+              </button>
             </div>
           </div>
           <div v-if="locationsBySite(site.id).length === 0" class="px-6 py-4 text-[#6b7280] text-sm">
@@ -85,9 +113,25 @@
                   {{ l.is_sale_location ? 'ရောင်းချရန်' : 'ဂိုထောင်' }}
                 </span>
               </td>
-              <td class="px-6 py-4 text-right space-x-2">
-                <button @click="editLocation(l)" class="text-[#1078D1] font-semibold text-sm hover:underline">ပြင်မည်</button>
-                <button @click="deleteLocation(l.id)" class="text-rose-600 font-semibold text-sm hover:underline">ဖျက်မည်</button>
+              <td class="px-6 py-4 text-right">
+                <div class="flex items-center justify-end gap-1.5">
+                  <button
+                    type="button"
+                    @click="editLocation(l)"
+                    class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-blue-600 hover:bg-blue-50 font-semibold text-sm transition-colors"
+                  >
+                    <Pencil class="w-4 h-4 shrink-0" />
+                    <span>ပြင်မည်</span>
+                  </button>
+                  <button
+                    type="button"
+                    @click="deleteLocation(l.id)"
+                    class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-red-600 hover:bg-red-50 font-semibold text-sm transition-colors"
+                  >
+                    <Trash2 class="w-4 h-4 shrink-0" />
+                    <span>ဖျက်မည်</span>
+                  </button>
+                </div>
               </td>
             </tr>
             <tr v-if="standaloneLocations.length === 0">
@@ -184,7 +228,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import api from '@/services/api'
-import { Plus } from 'lucide-vue-next'
+import { Plus, Pencil, Trash2 } from 'lucide-vue-next'
 
 const sites = ref([])
 const locations = ref([])
