@@ -9,6 +9,7 @@
     <div class="flex flex-wrap justify-between items-center gap-4 mb-6">
       <h1 class="page-title text-[var(--color-fg)]">Dashboard</h1>
       <select
+        v-if="hasAnySalesData"
         v-model="selectedTimeFilter"
         @change="fetchAllData"
         class="rounded-[var(--card-radius)] border border-[var(--color-border)] bg-white px-4 py-2.5 text-sm font-medium text-[var(--color-fg)] outline-none focus:ring-2 focus:ring-[var(--color-primary)]/25 focus:border-[var(--color-primary)] transition-shadow shadow-sm"
@@ -17,8 +18,68 @@
       </select>
     </div>
 
-    <!-- Responsive grid: 1 col mobile, 2 cols md, 4 cols lg. Cards/charts keep aspect and do not overlap. -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+    <!-- Getting Started Guide: only when total_revenue and total_vouchers are 0 -->
+    <section
+      v-if="analyticsLoaded && !hasAnySalesData"
+      class="flex flex-col items-center justify-center py-8 sm:py-12 px-4"
+      aria-label="Getting started guide"
+    >
+      <h2 class="text-xl sm:text-2xl font-bold text-[var(--color-fg)] mb-2 text-center">Getting Started Guide</h2>
+      <p class="text-sm text-[var(--color-fg-muted)] max-w-lg mb-8 text-center">အရောင်းအဝယ် မစတင်ရသေးပါ။ အောက်ပါ အဆင့်များအတိုင်း စတင်ပါ။</p>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 w-full max-w-4xl mx-auto">
+        <!-- Step 1: Outlet Setup -->
+        <div class="dashboard-card p-5 sm:p-6 flex flex-col">
+          <div class="flex items-center gap-3 mb-4">
+            <span class="flex items-center justify-center w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 shrink-0">
+              <CheckCircle2 class="w-6 h-6" :stroke-width="2" />
+            </span>
+            <h3 class="font-bold text-[var(--color-fg)] text-base">အဆင့် ၁ - ဆိုင်ခွဲ သတ်မှတ်ခြင်း</h3>
+          </div>
+          <p class="text-sm text-[var(--color-fg-muted)] mb-4 flex-1">သင်၏ ပင်မဆိုင် သို့မဟုတ် ဆိုင်ခွဲများကို အရင်ဆုံး သတ်မှတ်ပါ။</p>
+          <router-link
+            to="/shop-locations"
+            class="inline-flex items-center justify-center w-full py-2.5 px-4 rounded-xl bg-[var(--color-primary)] text-white text-sm font-semibold hover:opacity-90 transition-opacity"
+          >
+            ဆိုင်ခွဲများသို့ သွားရန်
+          </router-link>
+        </div>
+        <!-- Step 2: Inventory Setup -->
+        <div class="dashboard-card p-5 sm:p-6 flex flex-col">
+          <div class="flex items-center gap-3 mb-4">
+            <span class="flex items-center justify-center w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 shrink-0">
+              <CheckCircle2 class="w-6 h-6" :stroke-width="2" />
+            </span>
+            <h3 class="font-bold text-[var(--color-fg)] text-base">အဆင့် ၂ - ပစ္စည်းစာရင်း ထည့်သွင်းခြင်း</h3>
+          </div>
+          <p class="text-sm text-[var(--color-fg-muted)] mb-4 flex-1">ရောင်းချမည့် ကုန်ပစ္စည်း အမျိုးအစားများနှင့် ပစ္စည်းစာရင်းများကို ဖြည့်သွင်းပါ။</p>
+          <router-link
+            to="/products"
+            class="inline-flex items-center justify-center w-full py-2.5 px-4 rounded-xl bg-[var(--color-primary)] text-white text-sm font-semibold hover:opacity-90 transition-opacity"
+          >
+            ပစ္စည်းများ ထည့်သွင်းရန်
+          </router-link>
+        </div>
+        <!-- Step 3: Start Selling -->
+        <div class="dashboard-card p-5 sm:p-6 flex flex-col">
+          <div class="flex items-center gap-3 mb-4">
+            <span class="flex items-center justify-center w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 shrink-0">
+              <CheckCircle2 class="w-6 h-6" :stroke-width="2" />
+            </span>
+            <h3 class="font-bold text-[var(--color-fg)] text-base">အဆင့် ၃ - စတင် ရောင်းချခြင်း</h3>
+          </div>
+          <p class="text-sm text-[var(--color-fg-muted)] mb-4 flex-1">အကုန်လုံး အသင့်ဖြစ်ပြီဆိုလျှင် POS စနစ်မှ စတင် ရောင်းချနိုင်ပါပြီ။</p>
+          <router-link
+            to="/pos"
+            class="inline-flex items-center justify-center w-full py-2.5 px-4 rounded-xl bg-[var(--color-primary)] text-white text-sm font-semibold hover:opacity-90 transition-opacity"
+          >
+            POS သို့ သွားရန်
+          </router-link>
+        </div>
+      </div>
+    </section>
+
+    <!-- Analytics grid: only after first sale -->
+    <div v-else-if="analyticsLoaded" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
       <!-- Row 1: KPI cards (each 1 unit on lg) -->
       <!-- Total Revenue (Daily ရွေးထားရင် ထိုနေ့ရဲ့ စုစုပေါင်း ဝင်ငွေပဲ ပြမည်) -->
       <div class="dashboard-card p-5 min-w-0 overflow-hidden">
@@ -267,6 +328,9 @@
       </div>
     </div>
 
+    <!-- Loading state before first analytics fetch -->
+    <div v-else class="py-12 text-center text-[var(--color-fg-muted)] text-sm">Loading dashboard...</div>
+
     <div class="md:hidden h-20" aria-hidden="true"></div>
   </div>
 </template>
@@ -283,6 +347,7 @@ import {
   Wrench,
   Package,
   FileText,
+  CheckCircle2,
 } from 'lucide-vue-next'
 import api from '@/services/api'
 import { useExchangeRateStore } from '@/stores/exchangeRate'
@@ -321,6 +386,8 @@ const installationJobsCount = ref('—')
 const treatmentCount = ref('—')
 const todayPl = ref(null)
 const dashboardLoadError = ref(null)
+const analyticsLoaded = ref(false)
+const hasAnySalesData = ref(false)
 
 const totalRevenueDisplay = computed(() => {
   const raw = topCards.value[0]?.value ?? '0 Ks'
@@ -395,6 +462,11 @@ const fetchAllData = async () => {
     plByOutlet.value = data.charts?.pl_by_outlet || []
     if (data.charts?.sales_trend?.values) salesTrendData.value = data.charts.sales_trend.values
     dashboardLoadError.value = null
+    analyticsLoaded.value = true
+    const totalRev = Number(data.stats?.total_revenue || 0)
+    const totalVouchers = Number(data.stats?.total_vouchers ?? 0)
+    const recentCount = (data.recent_activities || []).length
+    hasAnySalesData.value = totalRev > 0 || totalVouchers > 0 || recentCount > 0
   } catch (err) {
     const status = err.response?.status
     const detail = err.response?.data?.detail

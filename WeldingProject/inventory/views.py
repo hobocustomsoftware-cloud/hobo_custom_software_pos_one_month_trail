@@ -2116,7 +2116,7 @@ class DashboardAnalyticsView(APIView):
             try:
                 stats = self.get_stats_by_role(user, role_name, low_stock_count, start_date, single_day, outlet_id)
             except Exception:
-                stats = {"total_revenue": 0, "active_services": 0, "low_stock_count": low_stock_count, "revenue_growth": "0%", "installation_jobs_count": 0, "today_pl": None}
+                stats = {"total_revenue": 0, "total_vouchers": 0, "active_services": 0, "low_stock_count": low_stock_count, "revenue_growth": "0%", "installation_jobs_count": 0, "today_pl": None}
             try:
                 activities = self.get_recent_activities(user, role_name, outlet_id)
             except Exception:
@@ -2135,7 +2135,7 @@ class DashboardAnalyticsView(APIView):
             return Response({
                 "user_info": {"username": getattr(request.user, "username", ""), "role": "staff"},
                 "stats": {
-                    "total_revenue": 0, "active_services": 0, "low_stock_count": 0,
+                    "total_revenue": 0, "total_vouchers": 0, "active_services": 0, "low_stock_count": 0,
                     "revenue_growth": "0%", "installation_jobs_count": 0, "today_pl": None,
                 },
                 "charts": {"top_selling": {"labels": [], "values": []}, "service_analytics": {}, "channel_performance": [], "pl_by_outlet": []},
@@ -2179,6 +2179,7 @@ class DashboardAnalyticsView(APIView):
         if role_name not in privileged_roles:
             sales_qs = sales_qs.filter(staff=user)
         total_revenue = sales_qs.aggregate(Sum('total_amount'))['total_amount__sum'] or 0
+        total_vouchers = sales_qs.count()
 
         # Active services & installation count: only when Settings toggles are on
         enable_service = True
@@ -2200,6 +2201,7 @@ class DashboardAnalyticsView(APIView):
 
         stats = {
             "total_revenue": total_revenue,
+            "total_vouchers": total_vouchers,
             "active_services": active_repairs,
             "low_stock_count": low_stock_count,
             "revenue_growth": "12%",
