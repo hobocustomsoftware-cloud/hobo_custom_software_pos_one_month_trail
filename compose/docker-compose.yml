@@ -43,6 +43,7 @@ services:
       args:
         VITE_API_URL: ${VITE_API_URL:-/api}
         VITE_BASE: ${VITE_BASE:-/app/}
+      
     command: >
       sh -c "
         for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
@@ -69,6 +70,8 @@ services:
       - DATABASE_URL=postgres://${POSTGRES_USER:-hobo}:${POSTGRES_PASSWORD:-hobo_secret}@postgres:5432/${POSTGRES_DB:-hobo_pos}
       - REDIS_URL=redis://:${REDIS_PASSWORD:-hobo_redis}@redis:6379/0
       - MACHINE_ID=${MACHINE_ID:-}
+    env_file:
+      - .env
     volumes:
       - backend_static_frontend:/app/static_frontend
       - media_volume:/app/media
