@@ -233,9 +233,12 @@ CORS_ALLOWED_ORIGINS = [
 ] + [o.strip() for o in _CORS_EXTRA.split(',') if o.strip()]
 CORS_ALLOW_ALL_ORIGINS = os.environ.get('CORS_ALLOW_ALL', 'True').lower() in ('true', '1', 'yes')
 
-# CSRF_TRUSTED_ORIGINS (Django 4+) - set in production
+# CSRF_TRUSTED_ORIGINS (Django 4+) - required for 403/400 on HTTPS POST; env can append
 _CSRF_ORIGINS = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
-CSRF_TRUSTED_ORIGINS = [o.strip() for o in _CSRF_ORIGINS.split(',') if o.strip()]
+CSRF_TRUSTED_ORIGINS = [
+    'https://pos.hobocustomsoftware.com',
+    'http://pos.hobocustomsoftware.com',
+] + [o.strip() for o in _CSRF_ORIGINS.split(',') if o.strip()]
 
 # settings.py
 CORS_ALLOW_HEADERS = [

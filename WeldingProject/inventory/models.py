@@ -45,6 +45,15 @@ class Category(models.Model):
     )
     order = models.IntegerField(default=0, verbose_name="Display Order")
     is_active = models.BooleanField(default=True, verbose_name="Active")
+    # Pseudo-isolation: link to shop (tenant) so ViewSets can filter by request.user.shop
+    shop = models.ForeignKey(
+        'core.ShopSettings',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='inventory_categories',
+        verbose_name="Shop (tenant)",
+    )
 
     def __str__(self):
         if self.parent:
@@ -153,6 +162,15 @@ class Product(models.Model):
         blank=True, 
         related_name='products',
         verbose_name="အမျိုးအစား"
+    )
+    # Pseudo-isolation: link to shop (tenant) so ViewSets can filter by request.user.shop
+    shop = models.ForeignKey(
+        'core.ShopSettings',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='inventory_products',
+        verbose_name="Shop (tenant)",
     )
     name = models.CharField(max_length=200)
     sku = models.CharField(

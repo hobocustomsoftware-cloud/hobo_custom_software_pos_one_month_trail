@@ -62,7 +62,7 @@ def _parse_quantity(val, default=1):
 # ----------------------------------------------------
 class CategoryViewSet(viewsets.ModelViewSet):
     """Categories: list/retrieve = Cashier+ (POS dropdown), create/update/delete = Inventory Manager+.
-    Strict multi-tenant: only categories that have products with inventory in the user's outlet(s).
+    Pseudo-isolation: filter by request.user.shop_id only (no reverse lookups like inventorymovement_set).
     """
     serializer_class = CategorySerializer
     permission_classes = [IsInventoryManagerOrHigher]
@@ -73,24 +73,27 @@ class CategoryViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = Category.objects.all().order_by('name')
-        shop_outlet_ids = get_shop_outlet_ids(self.request)
-        if shop_outlet_ids is not None:
-            if not shop_outlet_ids:
-                return qs.none()
-            # Subquery: product IDs that have at least one movement in the shop's outlets
-            products_in_shop = InventoryMovement.objects.filter(
-                outlet_id__in=shop_outlet_ids
-            ).values('product_id')
-            qs = qs.filter(products__id__in=Subquery(products_in_shop)).distinct()
+        shop_id = getattr(self.request.user, "shop_id", None)
+        if shop_id is not None:
+            qs = qs.filter(shop_id=shop_id)
+        elif not is_owner(self.request.user):
+            return qs.none()
         outlet_id = get_request_outlet_id(self.request)
         if outlet_id is not None:
-            products_in_outlet = InventoryMovement.objects.filter(
-                outlet_id=outlet_id
-            ).values('product_id')
-            qs = qs.filter(products__id__in=Subquery(products_in_outlet)).distinct()
-        elif not is_owner(self.request.user):
-            qs = qs.none()
+            product_ids = InventoryMovement.objects.filter(outlet_id=outlet_id).values('product_id')
+            qs = qs.filter(products__id__in=Subquery(product_ids)).distinct()
         return qs
+
+    def perform_create(self, serializer):
+        shop_id = getattr(self.request.user, "shop_id", None)
+        serializer.save(shop_id=shop_id)
+
+    def perform_update(self, serializer):
+        shop_id = getattr(self.request.user, "shop_id", None)
+        if shop_id is not None:
+            serializer.save(shop_id=shop_id)
+        else:
+            serializer.save()
 
     def get_permissions(self):
         if self.action in ('list', 'retrieve'):
@@ -173,18 +176,27 @@ class ProductViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = Product.objects.all().select_related('category', 'base_unit', 'purchase_unit').order_by('name')
-        shop_outlet_ids = get_shop_outlet_ids(self.request)
-        if shop_outlet_ids is not None:
-            if not shop_outlet_ids:
-                return qs.none()
-            # Product has InventoryMovement reverse relation; use movement.outlet for shop isolation
-            qs = qs.filter(inventorymovement_set__outlet_id__in=shop_outlet_ids).distinct()
+        shop_id = getattr(self.request.user, "shop_id", None)
+        if shop_id is not None:
+            qs = qs.filter(shop_id=shop_id)
         outlet_id = get_request_outlet_id(self.request)
         if outlet_id is not None:
-            qs = qs.filter(inventorymovement_set__outlet_id=outlet_id).distinct()
+            product_ids = InventoryMovement.objects.filter(outlet_id=outlet_id).values('product_id')
+            qs = qs.filter(pk__in=Subquery(product_ids))
         elif not is_owner(self.request.user):
             qs = qs.none()
         return qs
+
+    def perform_create(self, serializer):
+        shop_id = getattr(self.request.user, "shop_id", None)
+        serializer.save(shop_id=shop_id)
+
+    def perform_update(self, serializer):
+        shop_id = getattr(self.request.user, "shop_id", None)
+        if shop_id is not None:
+            serializer.save(shop_id=shop_id)
+        else:
+            serializer.save()
 
 
 class ProductLookupBySkuView(APIView):
@@ -2902,10 +2914,12 @@ class ProductCloneView(APIView):
         except Product.DoesNotExist:
             return Response({'error': 'Product not found'}, status=404)
 
-        # Clone product
+        # Clone product (preserve shop for pseudo-isolation)
+        shop_id = getattr(request.user, "shop_id", None) or getattr(original, "shop_id", None)
         cloned = Product.objects.create(
             name=f"{original.name} (Copy)",
             category=original.category,
+            shop_id=shop_id,
             sku=generate_unique_sku(f"{original.name} Copy"),
             model_no=original.model_no,
             retail_price=original.retail_price,

@@ -1,6 +1,11 @@
 # HoBo POS - One Month Trial (Google instance / Docker)
 # Run from one_month_trial: docker compose -f compose/docker-compose.yml up -d --build
 # App: http://localhost:${FRONTEND_PORT:-8888}/app/
+#
+# Build: frontend is built ONCE in Dockerfile.unified (stage fe); backend and frontend
+# both use that stage. Build backend first to populate cache, then frontend reuses it:
+#   docker compose -f compose/docker-compose.yml build backend && docker compose -f compose/docker-compose.yml build frontend
+# Or: docker compose -f compose/docker-compose.yml build  (order may run backend first and cache fe for frontend)
 
 services:
   redis:
@@ -39,7 +44,8 @@ services:
   backend:
     build:
       context: ..
-      dockerfile: WeldingProject/Dockerfile
+      dockerfile: compose/Dockerfile.unified
+      target: backend
       args:
         VITE_API_URL: ${VITE_API_URL:-/api}
         VITE_BASE: ${VITE_BASE:-/app/}
@@ -91,7 +97,9 @@ services:
 
   frontend:
     build:
-      context: ../yp_posf
+      context: ..
+      dockerfile: compose/Dockerfile.unified
+      target: fe-nginx
       args:
         VITE_API_URL: ${VITE_API_URL:-/api}
         VITE_BASE: ${VITE_BASE:-/app/}
