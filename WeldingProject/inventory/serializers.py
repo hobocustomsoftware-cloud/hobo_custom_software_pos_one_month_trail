@@ -17,10 +17,11 @@ class CategorySerializer(serializers.ModelSerializer):
     children = serializers.SerializerMethodField()
     parent_name = serializers.ReadOnlyField(source='parent.name')
     full_path = serializers.ReadOnlyField()
+    shop = serializers.PrimaryKeyRelatedField(read_only=True)
 
     class Meta:
         model = Category
-        fields = ['id', 'name', 'description', 'parent', 'parent_name', 'order', 'is_active', 'full_path', 'children']
+        fields = ['id', 'name', 'description', 'parent', 'parent_name', 'order', 'is_active', 'full_path', 'children', 'shop']
 
     def get_children(self, obj):
         """Recursively serialize child categories"""

@@ -39,10 +39,13 @@ from core.permissions import (
 from core.audit import log_audit
 from core.outlet_utils import filter_queryset_by_outlet, is_owner, get_request_outlet_id, get_shop_outlet_ids, user_can_access_location
 from rest_framework import serializers
+import logging
 import time
 import random
 import json
 from decimal import Decimal, InvalidOperation
+
+logger = logging.getLogger(__name__)
 from service.models import *
 from django.db.models import Sum, Count
 
@@ -73,25 +76,35 @@ class CategoryViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = Category.objects.all().order_by('name')
-        shop_id = getattr(self.request.user, "shop_id", None)
-        if shop_id is not None:
-            qs = qs.filter(shop_id=shop_id)
+        shop = getattr(self.request.user, "shop", None)
+        if shop is not None:
+            qs = qs.filter(shop=shop)
         elif not is_owner(self.request.user):
             return qs.none()
         outlet_id = get_request_outlet_id(self.request)
         if outlet_id is not None:
             product_ids = InventoryMovement.objects.filter(outlet_id=outlet_id).values('product_id')
             qs = qs.filter(products__id__in=Subquery(product_ids)).distinct()
+        # Debug: log user shop and queryset count
+        try:
+            user_shop_id = getattr(shop, "id", None) if shop else None
+            count = qs.count()
+            logger.info(
+                "CategoryViewSet.get_queryset: user.shop.id=%s, queryset.count=%s",
+                user_shop_id, count
+            )
+        except Exception:
+            pass
         return qs
 
     def perform_create(self, serializer):
-        shop_id = getattr(self.request.user, "shop_id", None)
-        serializer.save(shop_id=shop_id)
+        shop = getattr(self.request.user, "shop", None)
+        serializer.save(shop=shop)
 
     def perform_update(self, serializer):
-        shop_id = getattr(self.request.user, "shop_id", None)
-        if shop_id is not None:
-            serializer.save(shop_id=shop_id)
+        shop = getattr(self.request.user, "shop", None)
+        if shop is not None:
+            serializer.save(shop=shop)
         else:
             serializer.save()
 
