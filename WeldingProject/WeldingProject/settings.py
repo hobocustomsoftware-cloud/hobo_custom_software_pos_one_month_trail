@@ -42,10 +42,10 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-9_p1uorl3hht-a
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() in ('true', '1', 'yes')
 
-# ALLOWED_HOSTS: from env; if DEBUG=True use ['*'] for dev/deploy flexibility
-_raw = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1')
+# ALLOWED_HOSTS: demo server allows all domains/IPs; override with DJANGO_ALLOWED_HOSTS if needed
+_raw = os.environ.get('DJANGO_ALLOWED_HOSTS', '')
 _allowed = [h.strip() for h in _raw.split(',') if h.strip()]
-ALLOWED_HOSTS = ['*'] if DEBUG else (_allowed or ['localhost', '127.0.0.1'])
+ALLOWED_HOSTS = _allowed if _allowed else ['*']
 
 # External integrations (from .env in production)
 TELEGRAM_BOT_TOKEN = env('TELEGRAM_BOT_TOKEN')
@@ -57,6 +57,11 @@ GOOGLE_SHEETS_CREDENTIALS_JSON = env('GOOGLE_SHEETS_CREDENTIALS_JSON') or env('G
 
 # Demo / low-resource: single backend for all shops; subdomain → outlet; restrict admin for demo owners
 DEMO_MODE = os.environ.get('DEMO_MODE', 'False').lower() in ('true', '1', 'yes')
+
+# --- Demo server deployment (proxy + HTTPS, no redirect loop, API POSTs) ---
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_SSL_REDIRECT = False  # Proxy handles HTTPS; avoid ERR_TOO_MANY_REDIRECTS
+APPEND_SLASH = False  # Avoid redirect on POST so request body is not lost
 
 # Fix AutoField warnings
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
@@ -363,7 +368,7 @@ if not DEBUG:
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
-    SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'false').lower() in ('true', '1', 'yes')
+    SECURE_SSL_REDIRECT = False  # Demo: proxy handles HTTPS; set env SECURE_SSL_REDIRECT=true to enable
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
 

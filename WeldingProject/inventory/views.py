@@ -77,16 +77,11 @@ class CategoryViewSet(viewsets.ModelViewSet):
         if shop_outlet_ids is not None:
             if not shop_outlet_ids:
                 return qs.none()
-            qs = qs.filter(
-                Q(products__inventorymovement_set__to_location__outlet_id__in=shop_outlet_ids)
-                | Q(products__inventorymovement_set__from_location__outlet_id__in=shop_outlet_ids)
-            ).distinct()
+            # Category -> Product (products) -> InventoryMovement; use movement.outlet for shop isolation
+            qs = qs.filter(products__inventorymovement_set__outlet_id__in=shop_outlet_ids).distinct()
         outlet_id = get_request_outlet_id(self.request)
         if outlet_id is not None:
-            qs = qs.filter(
-                Q(products__inventorymovement_set__to_location__outlet_id=outlet_id)
-                | Q(products__inventorymovement_set__from_location__outlet_id=outlet_id)
-            ).distinct()
+            qs = qs.filter(products__inventorymovement_set__outlet_id=outlet_id).distinct()
         elif not is_owner(self.request.user):
             qs = qs.none()
         return qs
@@ -176,16 +171,11 @@ class ProductViewSet(viewsets.ModelViewSet):
         if shop_outlet_ids is not None:
             if not shop_outlet_ids:
                 return qs.none()
-            qs = qs.filter(
-                Q(inventorymovement_set__to_location__outlet_id__in=shop_outlet_ids)
-                | Q(inventorymovement_set__from_location__outlet_id__in=shop_outlet_ids)
-            ).distinct()
+            # Product has InventoryMovement reverse relation; use movement.outlet for shop isolation
+            qs = qs.filter(inventorymovement_set__outlet_id__in=shop_outlet_ids).distinct()
         outlet_id = get_request_outlet_id(self.request)
         if outlet_id is not None:
-            qs = qs.filter(
-                Q(inventorymovement_set__to_location__outlet_id=outlet_id)
-                | Q(inventorymovement_set__from_location__outlet_id=outlet_id)
-            ).distinct()
+            qs = qs.filter(inventorymovement_set__outlet_id=outlet_id).distinct()
         elif not is_owner(self.request.user):
             qs = qs.none()
         return qs
