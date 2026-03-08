@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from django.db import transaction, models
-from django.db.models import Sum, F, Q, Count, Case, When, Value, DecimalField, IntegerField
+from django.db.models import Sum, F, Q, Count, Case, When, Value, DecimalField, IntegerField, Subquery
 from django.db.models.functions import Coalesce, TruncDate, TruncWeek, TruncMonth, TruncYear
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
@@ -77,11 +77,17 @@ class CategoryViewSet(viewsets.ModelViewSet):
         if shop_outlet_ids is not None:
             if not shop_outlet_ids:
                 return qs.none()
-            # Category -> Product (products) -> InventoryMovement; use movement.outlet for shop isolation
-            qs = qs.filter(products__inventorymovement_set__outlet_id__in=shop_outlet_ids).distinct()
+            # Subquery: product IDs that have at least one movement in the shop's outlets
+            products_in_shop = InventoryMovement.objects.filter(
+                outlet_id__in=shop_outlet_ids
+            ).values('product_id')
+            qs = qs.filter(products__id__in=Subquery(products_in_shop)).distinct()
         outlet_id = get_request_outlet_id(self.request)
         if outlet_id is not None:
-            qs = qs.filter(products__inventorymovement_set__outlet_id=outlet_id).distinct()
+            products_in_outlet = InventoryMovement.objects.filter(
+                outlet_id=outlet_id
+            ).values('product_id')
+            qs = qs.filter(products__id__in=Subquery(products_in_outlet)).distinct()
         elif not is_owner(self.request.user):
             qs = qs.none()
         return qs
