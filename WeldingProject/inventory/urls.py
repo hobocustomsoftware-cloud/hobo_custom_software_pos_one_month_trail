@@ -20,6 +20,8 @@ router.register(r'bundles', views.BundleViewSet, basename='bundles')
 urlpatterns = [
     # Must be before router so /bundles/validate/ is not matched as pk
     path('bundles/validate/', views.ValidateBundleView.as_view(), name='bundles-validate'),
+    # Trailing-slash optional for categories (APPEND_SLASH=False): support both /api/categories and /api/categories/
+    path('categories', views.CategoryViewSet.as_view({'get': 'list', 'post': 'create'}), name='admin-categories-no-slash'),
     # ----------------------------------------------------
     # 1. Router-based URLs (Category, Product Admin, Locations Admin)
     # ----------------------------------------------------

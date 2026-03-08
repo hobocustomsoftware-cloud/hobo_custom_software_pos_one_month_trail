@@ -76,25 +76,14 @@ class CategoryViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = Category.objects.all().order_by('name')
-        shop = getattr(self.request.user, "shop", None)
-        if shop is not None:
-            qs = qs.filter(shop=shop)
+        shop_id = getattr(self.request.user, "shop_id", None)
+        print(f"DEBUG: User Shop ID: {shop_id}")
+        if shop_id is not None:
+            qs = qs.filter(shop_id=shop_id)
         elif not is_owner(self.request.user):
             return qs.none()
-        outlet_id = get_request_outlet_id(self.request)
-        if outlet_id is not None:
-            product_ids = InventoryMovement.objects.filter(outlet_id=outlet_id).values('product_id')
-            qs = qs.filter(products__id__in=Subquery(product_ids)).distinct()
-        # Debug: log user shop and queryset count
-        try:
-            user_shop_id = getattr(shop, "id", None) if shop else None
-            count = qs.count()
-            logger.info(
-                "CategoryViewSet.get_queryset: user.shop.id=%s, queryset.count=%s",
-                user_shop_id, count
-            )
-        except Exception:
-            pass
+        count = qs.count()
+        print(f"DEBUG: CategoryViewSet queryset count: {count}")
         return qs
 
     def perform_create(self, serializer):
