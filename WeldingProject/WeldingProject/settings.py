@@ -43,10 +43,10 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-9_p1uorl3hht-a
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() in ('true', '1', 'yes')
 
 # ALLOWED_HOSTS: demo server allows all domains/IPs; override with DJANGO_ALLOWED_HOSTS if needed
-_raw = os.environ.get('DJANGO_ALLOWED_HOSTS', '')
-_allowed = [h.strip() for h in _raw.split(',') if h.strip()]
-ALLOWED_HOSTS = _allowed if _allowed else ['*']
-
+# _raw = os.environ.get('DJANGO_ALLOWED_HOSTS', '')
+# _allowed = [h.strip() for h in _raw.split(',') if h.strip()]
+# ALLOWED_HOSTS = _allowed if _allowed else ['*']
+ALLOWED_HOSTS = ['pos.hobocustomsoftware.com', '.googleusercontent.com', 'localhost', '127.0.0.1', '*']
 # External integrations (from .env in production)
 TELEGRAM_BOT_TOKEN = env('TELEGRAM_BOT_TOKEN')
 TELEGRAM_CHAT_ID = env('TELEGRAM_CHAT_ID')
