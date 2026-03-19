@@ -230,6 +230,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:80",
     "https://pos.hobocustomsoftware.com",
     "http://pos.hobocustomsoftware.com",
+    "https://hobocustomsoftwareposonemonthtrail-production-1289.up.railway.app",
 ] + [o.strip() for o in _CORS_EXTRA.split(',') if o.strip()]
 CORS_ALLOW_ALL_ORIGINS = os.environ.get('CORS_ALLOW_ALL', 'True').lower() in ('true', '1', 'yes')
 
@@ -238,6 +239,7 @@ _CSRF_ORIGINS = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
 CSRF_TRUSTED_ORIGINS = [
     'https://pos.hobocustomsoftware.com',
     'http://pos.hobocustomsoftware.com',
+    "https://*.railway.app",
 ] + [o.strip() for o in _CSRF_ORIGINS.split(',') if o.strip()]
 
 # settings.py
