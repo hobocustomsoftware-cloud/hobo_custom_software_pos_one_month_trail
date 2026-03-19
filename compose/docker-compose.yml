@@ -88,12 +88,12 @@ services:
       redis:
         condition: service_started
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health/').raise_for_status()"]
-      interval: 15s
-      timeout: 10s
-      retries: 15
-      start_period: 180s
+    # healthcheck:
+    #   test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health/').raise_for_status()"]
+    #   interval: 15s
+    #   timeout: 10s
+    #   retries: 15
+    #   start_period: 180s
 
   frontend:
     build:
