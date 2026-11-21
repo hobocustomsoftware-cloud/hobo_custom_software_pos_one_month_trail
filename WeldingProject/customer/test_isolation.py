@@ -56,6 +56,23 @@ class CrossShopIsolationTest(TestCase):
         r = self.client.get(f"/api/service/repairs/{self.rep_b.id}/")
         self.assertEqual(r.status_code, 404, r.content)
 
+    def _make_sale(self, staff, outlet):
+        from inventory.models import SaleTransaction
+        sale = SaleTransaction.objects.create(staff=staff, outlet=outlet, status='approved')
+        return sale
+
+    def test_staff_a_cannot_touch_shop_b_payment_proof(self):
+        sale_b = self._make_sale(self.staff_b, self.outlet_b)
+        r = self.client.put(f"/api/sales/{sale_b.id}/upload-payment-proof/", {}, format='multipart')
+        # 404 = outlet-scoped out; 403 = creator/admin check; either way shop B is safe.
+        self.assertIn(r.status_code, (400, 403, 404), r.content)
+
+    def test_staff_a_cannot_touch_shop_b_payment_status(self):
+        sale_b = self._make_sale(self.staff_b, self.outlet_b)
+        self.client.force_authenticate(user=make_user("mgr_a", "manager", self.outlet_a, "95945000009"))
+        r = self.client.put(f"/api/sales/{sale_b.id}/payment-status/", {"payment_status": "paid"}, format='json')
+        self.assertEqual(r.status_code, 404, r.content)
+
     def test_staff_b_sees_only_shop_b(self):
         self.client.force_authenticate(user=self.staff_b)
         ids = self._ids("/api/customers/")

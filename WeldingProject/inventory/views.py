@@ -2519,10 +2519,15 @@ class PaymentProofUploadView(generics.UpdateAPIView):
     queryset = SaleTransaction.objects.all()
     serializer_class = PaymentProofUploadSerializer
     permission_classes = [IsAuthenticated]
-    
+
+    def get_queryset(self):
+        # Outlet-scoped: staff of shop B get 404 on shop A's sales.
+        from core.outlet_utils import filter_queryset_by_outlet
+        return filter_queryset_by_outlet(super().get_queryset(), self.request)
+
     def update(self, request, *args, **kwargs):
         sale = self.get_object()
-        
+
         # Sale staff who created the sale can upload, or admin/manager
         if sale.staff != request.user:
             # Check if user is admin/manager
@@ -2574,10 +2579,14 @@ class PaymentProofUploadView(generics.UpdateAPIView):
 
 
 class PaymentStatusUpdateView(generics.UpdateAPIView):
-    """Update payment status for a sale"""
+    """Update payment status for a sale (Admin+ of the same outlet)."""
     queryset = SaleTransaction.objects.all()
     serializer_class = PaymentStatusUpdateSerializer
     permission_classes = [IsAdminOrHigher]
+
+    def get_queryset(self):
+        from core.outlet_utils import filter_queryset_by_outlet
+        return filter_queryset_by_outlet(super().get_queryset(), self.request)
     
     def update(self, request, *args, **kwargs):
         sale = self.get_object()
