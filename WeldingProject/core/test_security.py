@@ -132,9 +132,15 @@ class SettingsSecurityInvariantsTest(TestCase):
 
 
 class TrialGateTest(TestCase):
-    """TrialExpiryMiddleware: 30 days, then business APIs return 403."""
+    """Unified gate trial leg: 30 days, then business APIs return 403."""
 
     def setUp(self):
+        import os
+        # Trial enforcement only runs where licenses are enforced
+        # (on_premise); elsewhere SKIP_LICENSE/hosted skips both gates.
+        os.environ['DEPLOYMENT_MODE'] = 'on_premise'
+        os.environ.pop('SKIP_LICENSE', None)
+        self.addCleanup(os.environ.pop, 'DEPLOYMENT_MODE', None)
         self.client = APIClient()
         role, _ = Role.objects.get_or_create(name="sale_staff")
         self.user = User.objects.create_user(
@@ -273,3 +279,94 @@ class AnonymousApiAccessTest(TestCase):
     def test_forged_bearer_token_is_rejected(self):
         r = self.client.get("/api/core/me/", HTTP_AUTHORIZATION="Bearer aaa.bbb.ccc")
         self.assertIn(r.status_code, (401, 403))
+
+
+class UnifiedGateTest(TestCase):
+    """_unified_access_check(): one order for license + trial."""
+
+    def setUp(self):
+        import os
+        self._saved = {k: os.environ.get(k) for k in ("SKIP_LICENSE", "DEPLOYMENT_MODE")}
+        os.environ["DEPLOYMENT_MODE"] = "on_premise"
+        os.environ.pop("SKIP_LICENSE", None)
+
+    def tearDown(self):
+        import os
+        for k, v in self._saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
+    def test_skip_switch_opens_the_gate(self):
+        import os
+        from license.middleware import _unified_access_check
+        os.environ["SKIP_LICENSE"] = "true"
+        self.assertIsNone(_unified_access_check("/api/sales/"))
+
+    def test_auth_paths_stay_open(self):
+        from license.middleware import _unified_access_check
+        self.assertIsNone(_unified_access_check("/api/core/auth/login/"))
+        self.assertIsNone(_unified_access_check("/api/token/"))
+
+    def test_valid_installation_passes(self):
+        from license.middleware import _unified_access_check
+        verdict = _unified_access_check("/api/sales/")
+        self.assertIsNone(verdict)
+
+
+class SubscriptionPlansTest(TestCase):
+    """Dynamic plans: public, seeded, editable without deploys."""
+
+    def setUp(self):
+        self.client = APIClient()
+
+    def test_plans_are_public_and_seeded(self):
+        r = self.client.get("/api/license/plans/")
+        self.assertEqual(r.status_code, 200, r.content)
+        body = r.json()
+        self.assertGreaterEqual(len(body["plans"]), 3)
+        self.assertTrue(body["backup_addon_available"])
+        codes = [p["code"] for p in body["plans"]]
+        self.assertIn("sub_basic", codes)
+
+    def test_plan_price_edit_is_instant(self):
+        from license.models import SubscriptionPlan
+        self.client.get("/api/license/plans/")  # seed
+        plan = SubscriptionPlan.objects.get(code="sub_basic")
+        plan.price_mmk = 99999
+        plan.save()
+        body = self.client.get("/api/license/plans/").json()
+        price = [p for p in body["plans"] if p["code"] == "sub_basic"][0]["price_mmk"]
+        self.assertEqual(price, 99999)
+
+
+class BackupAddOnTest(TestCase):
+    """Per-shop backup: local export free, cloud gated on the add-on."""
+
+    def setUp(self):
+        self.client = APIClient()
+        role, _ = Role.objects.get_or_create(name="owner")
+        self.owner = User.objects.create_user(
+            username="backup_owner", password="Backup-Pass-1",
+            phone_number="95945007788", role_obj=role,
+        )
+        self.client.force_authenticate(user=self.owner)
+
+    def test_status_without_addon_offers_local_only(self):
+        r = self.client.get("/api/license/backup/status/")
+        self.assertEqual(r.status_code, 200, r.content)
+        body = r.json()
+        self.assertTrue(body["local_export"])
+        self.assertFalse(body["cloud_backup"])
+
+    def test_activate_with_bad_key_is_400(self):
+        r = self.client.post("/api/license/backup/activate/", {"backup_key": "NOPE"})
+        self.assertEqual(r.status_code, 400)
+
+    def test_activate_with_valid_key_unlocks_cloud(self):
+        from license.models import BackupAddOn
+        BackupAddOn.objects.create(license_key="BACKUP-KEY-1", is_active=True)
+        r = self.client.post("/api/license/backup/activate/", {"backup_key": "BACKUP-KEY-1"})
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertTrue(self.client.get("/api/license/backup/status/").json()["cloud_backup"])

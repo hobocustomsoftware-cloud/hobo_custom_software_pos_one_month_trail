@@ -2210,12 +2210,25 @@ class DashboardAnalyticsView(APIView):
         gs_i = GlobalSetting.objects.filter(key='enable_installation').first()
         if gs_i and (gs_i.value or '').strip().lower() in ('0', 'false', 'no'):
             enable_installation = False
-        active_repairs = RepairService.objects.exclude(status__in=['completed', 'cancelled']).count() if enable_service else 0
+        # Outlet-scoped: staff see only their own shop's repairs/jobs, never other shops'.
+        # RepairService reaches the outlet through location__outlet; InstallationJob
+        # through sale_transaction__outlet (both nullable, so unscoped rows are
+        # visible to privileged roles but hidden from floor staff).
+        repair_scope = RepairService.objects.all()
+        if enable_service:
+            if outlet_id is not None:
+                repair_scope = repair_scope.filter(location__outlet_id=outlet_id)
+            if role_name not in ('admin', 'owner', 'super_admin', 'manager'):
+                repair_scope = repair_scope.filter(staff=user)
+        active_repairs = repair_scope.exclude(status__in=['completed', 'cancelled']).count() if enable_service else 0
         installation_jobs_count = 0
         if enable_installation:
             try:
                 from installation.models import InstallationJob
-                installation_jobs_count = InstallationJob.objects.count()
+                jobs_qs = InstallationJob.objects.all()
+                if outlet_id is not None:
+                    jobs_qs = jobs_qs.filter(sale_transaction__outlet_id=outlet_id)
+                installation_jobs_count = jobs_qs.count()
             except Exception:
                 pass
 
@@ -2272,6 +2285,8 @@ class DashboardAnalyticsView(APIView):
         if outlet_id is not None:
             sales_f &= Q(outlet_id=outlet_id)
         service_f = Q()
+        if outlet_id is not None:
+            service_f &= Q(location__outlet_id=outlet_id)
         # Location reverse: SaleTransaction.sale_location → Location.saletransaction_set (Django default)
         loc_sales_f = Q(saletransaction_set__status='approved')
         if outlet_id is not None:
@@ -2296,6 +2311,8 @@ class DashboardAnalyticsView(APIView):
             pending_qs = pending_qs.filter(outlet_id=outlet_id)
         pending_sales = pending_qs.count()
         all_services = RepairService.objects.filter(service_f)
+        if role_name not in ('admin', 'owner', 'super_admin', 'manager'):
+            all_services = all_services.filter(staff=user)
         cancelled_qs = SaleTransaction.objects.filter(status='cancelled')
         if outlet_id is not None:
             cancelled_qs = cancelled_qs.filter(outlet_id=outlet_id)
@@ -2348,9 +2365,12 @@ class DashboardAnalyticsView(APIView):
         if not is_owner(user):
             outlet_id = getattr(user, "primary_outlet_id", None)
         activities = []
-        sales_qs = SaleTransaction.objects.all().select_related('staff').order_by('-created_at')[:5]
+        sales_qs = SaleTransaction.objects.all().select_related('staff').order_by('-created_at')
         if outlet_id is not None:
             sales_qs = sales_qs.filter(outlet_id=outlet_id)
+        if role_name not in ('admin', 'owner', 'super_admin', 'manager'):
+            sales_qs = sales_qs.filter(staff=user)
+        sales_qs = sales_qs[:5]
         for s in sales_qs:
             activities.append({
                 "id": s.id,
@@ -2363,7 +2383,12 @@ class DashboardAnalyticsView(APIView):
                 "status": s.status.capitalize(),
             })
 
-        repairs = RepairService.objects.all().select_related('staff').order_by('-created_at')[:5]
+        repairs = RepairService.objects.all().select_related('staff').order_by('-created_at')
+        if outlet_id is not None:
+            repairs = repairs.filter(location__outlet_id=outlet_id)
+        if role_name not in ('admin', 'owner', 'super_admin', 'manager'):
+            repairs = repairs.filter(staff=user)
+        repairs = repairs[:5]
         for r in repairs:
             activities.append({
                 "id": f"repair-{r.id}",
