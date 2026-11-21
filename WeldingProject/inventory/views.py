@@ -77,13 +77,13 @@ class CategoryViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         qs = Category.objects.all().order_by('name')
         shop_id = getattr(self.request.user, "shop_id", None)
-        print(f"DEBUG: User Shop ID: {shop_id}")
+        logger.debug("CategoryViewSet user shop_id=%s", shop_id)
         if shop_id is not None:
             qs = qs.filter(shop_id=shop_id)
         elif not is_owner(self.request.user):
             return qs.none()
         count = qs.count()
-        print(f"DEBUG: CategoryViewSet queryset count: {count}")
+        logger.debug("CategoryViewSet queryset count=%s", count)
         return qs
 
     def perform_create(self, serializer):
@@ -2081,7 +2081,17 @@ class WarrantyExpiringSoonView(generics.ListAPIView):
 #               Dashboard Views
 #-----------------------------------------------------------------
 class DashboardAnalyticsView(APIView):
-    """Dashboard: Role ရှိသူအားလုံး ကြည့်နိုင် (role အလိုက် stats/charts ပြမည်)."""
+    """One dashboard URL for every role, each role seeing only its own scope.
+
+    Why this shape (documented because the old docs said 'manager-only'): the
+    POS needs one dashboard screen for all staff. Owners/managers see
+    shop-wide totals and P&L; cashiers and floor staff see ONLY their own
+    sales (staff=<me>) inside their own outlet, never colleagues' rows and
+    never cost/profit figures. Non-owners are pinned to primary_outlet_id
+    and any ?outlet_id= they pass is ignored. Repair/installation aggregates
+    below are still shop-wide counts (no per-staff owner on those rows) -
+    that is the one documented exception, not per-person data.
+    """
     permission_classes = [IsStaffOrHigher]
 
     def get(self, request):

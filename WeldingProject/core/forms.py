@@ -9,9 +9,11 @@ class CustomUserCreationForm(UserCreationForm):
         fields = ('username', 'email', 'role_obj') # role အစား role_obj ကို သုံးပါ
 
     def save(self, commit=True):
+        from django.contrib.auth.hashers import make_password
         user = super().save(commit=False)
-        # Plain password ကို temp_password ထဲတွင် သိမ်းခြင်း (Owner ကြည့်ရန်)
-        user.temp_password = self.cleaned_data["password"]
+        # Hash only: plaintext is never stored. Shown once via the API create
+        # response, never recoverable from the database.
+        user.temp_password = make_password(self.cleaned_data["password"])
         if commit:
             user.save()
         return user
@@ -24,7 +26,8 @@ class CustomUserChangeForm(UserChangeForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # temp_password ကို Admin panel တွင် ပြင်၍မရဘဲ ကြည့်ရုံသာ (Read-only) လုပ်ထားနိုင်သည်
+        # temp_password holds only a hash: visible in admin for rotation audits,
+        # never a usable password. The clear text is shown once at creation.
         if 'temp_password' in self.fields:
             self.fields['temp_password'].disabled = True
-            self.fields['temp_password'].help_text = "This is the current plain password for owner reference."
+            self.fields['temp_password'].help_text = "Hashed one-time password (unrecoverable). Create a new password to rotate."

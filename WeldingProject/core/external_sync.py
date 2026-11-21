@@ -95,6 +95,25 @@ def _append_to_google_sheet(row: list) -> bool:
         return False
 
 
+def send_password_reset_alert(user, reset_url: str) -> bool:
+    """
+    Deliver a Manager-approved password-reset link to the SHOP OWNER over
+    Telegram (the offline POS has no email/SMS to verify the caller).
+    The token is never returned to the reset requester, so knowing a
+    username/phone alone can no longer take over an account.
+    Returns True when Telegram accepted the message.
+    """
+    username = getattr(user, 'username', '') or ''
+    phone = getattr(user, 'phone_number', None) or ''
+    message = (
+        "Password reset requested\n"
+        f"User: {username}\n"
+        f"Phone: {phone}\n"
+        f"Link (1 hour): {reset_url}"
+    )
+    return _send_telegram(message)
+
+
 def sync_new_registration(user, shop_name: str = ''):
     """
     Sync new registration to Telegram and Google Sheets (follow-up marketing).
