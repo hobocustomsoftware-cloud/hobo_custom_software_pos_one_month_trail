@@ -20,6 +20,23 @@ class RepairServiceViewSet(viewsets.ModelViewSet):
     ordering_fields = ['received_date', 'repair_no', 'status']
     ordering = ['-received_date']
 
+    def get_queryset(self):
+        # Outlet isolation: staff see their own shop's repairs (any assignee),
+        # managers+ see the whole outlet. Rows with location=None stay
+        # privileged-only (no outlet to prove they belong to this shop).
+        from core.outlet_utils import get_request_outlet_id, is_owner
+        qs = super().get_queryset()
+        user = self.request.user
+        role = (getattr(getattr(user, 'role_obj', None), 'name', None) or '').lower()
+        privileged = role in ('admin', 'owner', 'super_admin', 'manager', 'superuser', 'super') or is_owner(user)
+        outlet_id = get_request_outlet_id(self.request)
+        if outlet_id is not None:
+            qs = qs.filter(location__outlet_id=outlet_id)
+            return qs
+        if not privileged:
+            return qs.none()
+        return qs
+
     def perform_create(self, serializer):
         deposit = self.request.data.get('deposit_amount', 0)
         is_paid = float(deposit) > 0
@@ -114,6 +131,16 @@ class RepairTrackingView(APIView):
 class TreatmentRecordViewSet(viewsets.ModelViewSet):
     """လူနာ ကုသမှုမှတ်တမ်း CRUD + ဓာတ်မှန်/အယ်ထရာဆောင်း ဖိုင်များ"""
     queryset = TreatmentRecord.objects.all().select_related('customer', 'staff').prefetch_related('files').order_by('-created_at')
+
+    def get_queryset(self):
+        # Same outlet rule as repairs: non-privileged staff see only own rows.
+        from core.outlet_utils import is_owner
+        qs = super().get_queryset()
+        user = self.request.user
+        role = (getattr(getattr(user, 'role_obj', None), 'name', None) or '').lower()
+        if role not in ('admin', 'owner', 'super_admin', 'manager', 'superuser', 'super') and not is_owner(user):
+            qs = qs.filter(staff=user)
+        return qs
     serializer_class = TreatmentRecordSerializer
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]

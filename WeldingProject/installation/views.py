@@ -38,8 +38,12 @@ class InstallationJobViewSet(viewsets.ModelViewSet):
         return InstallationJobSerializer
 
     def get_queryset(self):
-        queryset = super().get_queryset()
-        
+        from core.outlet_utils import filter_queryset_by_outlet
+        queryset = filter_queryset_by_outlet(
+            super().get_queryset(), self.request,
+            outlet_field='sale_transaction__outlet_id',
+        )
+
         # Filter by status if provided
         status_filter = self.request.query_params.get('status', None)
         if status_filter:

@@ -19,7 +19,7 @@ from core.outlet_utils import filter_queryset_by_outlet, get_request_outlet_id
 
 
 class ExpenseCategoryViewSet(viewsets.ModelViewSet):
-    """Expense Category CRUD"""
+    """Expense Category CRUD (global lookup table: same categories for every shop)."""
     queryset = ExpenseCategory.objects.all()
     serializer_class = ExpenseCategorySerializer
     permission_classes = [IsAuthenticated]
