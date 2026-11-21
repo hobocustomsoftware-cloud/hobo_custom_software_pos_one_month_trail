@@ -28,29 +28,35 @@ SKIP_LICENSE_PATHS = [
 ]
 
 
+def _license_mode():
+    """Resolution order: SKIP_LICENSE > DEPLOYMENT_MODE > DEBUG.
+
+    - SKIP_LICENSE=true: never enforce (local dev, CI, demos).
+    - DEPLOYMENT_MODE=hosted: trial middleware owns expiry; license skipped.
+    - DEPLOYMENT_MODE=on_premise: enforce even with DEBUG=True so shops can
+      rehearse expiry locally (prevents the 'works here, blocked there' gap).
+    - unset mode: legacy behaviour, DEBUG=True skips.
+    """
+    if os.environ.get('SKIP_LICENSE', 'false').lower() in ('true', '1', 'yes'):
+        return 'skip'
+    mode = os.environ.get('DEPLOYMENT_MODE', '').strip().lower()
+    if mode == 'hosted':
+        return 'skip'
+    if mode == 'on_premise':
+        return 'enforce'
+    if getattr(settings, 'DEBUG', False):
+        return 'skip'  # Development: DEBUG=True မှာ license မစစ်
+    return 'enforce'
+
+
 def _should_skip_license():
     """Dev / hosted မှာ license စစ်ဆေးခြင်း skip လုပ်မလုပ်။ on_premise သတ်မှတ်ထားမှသာ စစ်မည်။"""
-    if os.environ.get('SKIP_LICENSE', 'false').lower() in ('true', '1', 'yes'):
-        return True
-    if getattr(settings, 'DEBUG', False):
-        return True  # Development: DEBUG=True မှာ license မစစ်
-    # Only enforce license when explicitly on_premise (EXE/standalone)
-    mode = os.environ.get('DEPLOYMENT_MODE', '').strip().lower()
-    if mode != 'on_premise':
-        return True  # hosted, empty, or other => skip so /api/staff/items/, dashboard, ai work
-    return False
+    return _license_mode() == 'skip'
 
 
 def _should_skip(request, path):
     if _should_skip_license():
         return True
-    # Localhost / 127.0.0.1 => skip so dev and Docker (user hits localhost) work without license
-    try:
-        host = (request.get_host().split(':')[0] or '').lower()
-        if host in ('localhost', '127.0.0.1', 'backend', 'frontend'):
-            return True
-    except Exception:
-        pass
     for prefix in SKIP_LICENSE_PATHS:
         if path.startswith(prefix):
             return True
@@ -65,10 +71,12 @@ class LicenseCheckMiddleware(MiddlewareMixin):
 
     def process_request(self, request):
         path = request.path
-        # Never block /api/ with license – let DRF handle auth/permission (avoids 403 for staff/items, payment-methods, etc.)
-        if path.startswith('/api/'):
-            return None
         if _should_skip(request, path):
+            return None
+        # Money-moving APIs are always gated when a license is required:
+        # an expired shop must not keep selling. Read-only dashboard calls
+        # stay open so staff still see the 'license expired' banner + totals.
+        if path.startswith('/api/') and request.method in ('GET', 'HEAD', 'OPTIONS'):
             return None
 
         result = check_license_status()

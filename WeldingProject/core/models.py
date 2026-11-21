@@ -88,7 +88,9 @@ class User(AbstractUser):
     )
     # Dynamic Role ချိတ်ဆက်မှု
     role_obj = models.ForeignKey(Role, on_delete=models.SET_NULL, null=True, blank=True)
-    # Password ကို Owner ပြန်ကြည့်နိုင်ရန် (PlainText အနေဖြင့် ခဏသိမ်းထားမည့် Field)
+    # One-time password hash (Django-hashed, never plaintext). Clear text is
+    # shown once in the create-employee POST response, unrecoverable after.
+    # Legacy rows may hold plaintext until rotated; treat them as compromised.
     temp_password = models.CharField(max_length=128, blank=True, null=True)
     # First login: force password change (Owner adds staff with default password)
     requires_password_change = models.BooleanField(default=False, verbose_name="Must change password on first login")

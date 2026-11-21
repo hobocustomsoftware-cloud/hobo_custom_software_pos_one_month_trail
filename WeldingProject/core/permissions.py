@@ -15,8 +15,13 @@ def _role_name(user):
 
 
 def is_cashier_role(user):
-    """Cashier: POS + Sale Request only. No admin, no reports, no cost."""
-    return _role_name(user) in ("cashier",)
+    """POS selling staff who must NOT see purchase cost.
+
+    'sale_staff' / 'sale_supervisor' are the roles created by the seed
+    (seed_demo_users, seed_one_year, run_simulation_data, simulate_month) for
+    selling staff, so they get the same cost-hiding as 'cashier'.
+    """
+    return _role_name(user) in ("cashier", "sale_staff", "sale_supervisor")
 
 
 def is_store_keeper_role(user):
@@ -25,14 +30,29 @@ def is_store_keeper_role(user):
     return r in ("store_keeper", "storekeeper", "store keeper")
 
 
+# --- Role tiers (single source of truth, exact + case-insensitive matching) ---
+# Manager tier: approve sales, admin & reports (docs/RBAC_STAFF_ACCESS_CONTROL.md
+# + the manager-suffixed roles created by seed / simulate data).
+MANAGER_ROLE_NAMES = (
+    "owner",
+    "admin",
+    "manager",
+    "super_admin",
+    "assistant_manager",
+    "inventory_manager",
+)
+
+# POS tier: product list, sale request, locations, own sales.
+POS_ROLE_NAMES = ("cashier", "sale_staff")
+
+
 def is_manager_or_higher(user):
     """Manager, Admin, Owner: can approve sales, access admin/reports."""
     if not user or not user.is_authenticated:
         return False
     if user.is_superuser:
         return True
-    r = _role_name(user)
-    return r in ("owner", "admin", "manager", "super_admin")
+    return _role_name(user) in MANAGER_ROLE_NAMES
 
 
 def is_cashier_or_higher(user):
@@ -42,7 +62,7 @@ def is_cashier_or_higher(user):
     if user.is_superuser:
         return True
     r = _role_name(user)
-    return r in ("owner", "admin", "manager", "super_admin", "cashier", "assistant_manager")
+    return r in ("owner", "admin", "manager", "super_admin", "assistant_manager") + POS_ROLE_NAMES
 
 
 def is_store_keeper_or_higher(user):
@@ -78,27 +98,28 @@ class IsOwner(permissions.BasePermission):
             return False
 
 class IsAdminOrHigher(permissions.BasePermission):
-    """Approval ပေးနိုင်သည့် Role များ (Owner, Admin, Manager)"""
+    """Approval ပေးနိုင်သည့် Role များ (Manager tier).
+
+    NOTE: this used substring matching (`'manager' in role_name`) while
+    IsManagerOrHigher matched exactly, so a role like `inventory_manager` could
+    approve sales but got 403 on the dashboard. Both now share
+    MANAGER_ROLE_NAMES (exact, case-insensitive), and DELETE stays owner-only.
+    """
     def has_permission(self, request, view):
         user = request.user
         if not (user and user.is_authenticated):
             return False
-        
+
         # Superuser က အကုန်လုပ်ခွင့်ရှိသည်
         if user.is_superuser:
             return True
-        
-        try:
-            ro = getattr(user, "role_obj", None)
-            if not ro:
-                return False
-            role_name = (getattr(ro, "name", None) or "").lower()
-            allowed_roles = ['owner', 'admin', 'manager', 'super_admin']
-            if request.method == 'DELETE':
-                return 'owner' in role_name
-            return any(r in role_name for r in allowed_roles)
-        except Exception:
+
+        role_name = _role_name(user)
+        if not role_name:
             return False
+        if request.method == 'DELETE':
+            return role_name == 'owner'
+        return role_name in MANAGER_ROLE_NAMES
 
 class IsInventoryManagerOrHigher(permissions.BasePermission):
     """Inventory ဆိုင်ရာ လုပ်ပိုင်ခွင့် (Manager, Inventory, Admin, Owner)"""
@@ -113,10 +134,12 @@ class IsInventoryManagerOrHigher(permissions.BasePermission):
             ro = getattr(user, "role_obj", None)
             if ro:
                 role_name = (getattr(ro, "name", None) or "").lower()
-                allowed_roles = ['inventory', 'admin', 'owner', 'manager']
                 if request.method == 'DELETE':
-                    return 'owner' in role_name or user.is_superuser
-                return any(r in role_name for r in allowed_roles)
+                    return role_name == 'owner' or user.is_superuser
+                # Manager tier + every `inventory*` role (inventory, inventory_staff, ...).
+                # Previously substring-matched, which also matched unrelated names like
+                # `owner_notes` -> keep only the grants that existed for real roles.
+                return role_name in MANAGER_ROLE_NAMES or role_name.startswith('inventory')
         except Exception:
             pass
         return False

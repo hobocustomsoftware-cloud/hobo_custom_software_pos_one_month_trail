@@ -1,7 +1,8 @@
 import secrets
+from django.contrib.auth.hashers import make_password
 from rest_framework import serializers
 from .models import User, Role, ShopSettings, Shift, BUSINESS_CATEGORY_CHOICES, CURRENCY_CHOICES
-from .phone_utils import validate_myanmar_phone
+from .phone_utils import validate_myanmar_phone, phone_lookup_variants
 from inventory.models import Location
 
 # ၁။ Role အတွက် Serializer
@@ -111,16 +112,29 @@ class EmployeeSerializer(serializers.ModelSerializer):
     def get_role_name(self, obj):
         return getattr(obj.role_obj, 'name', None) if getattr(obj, 'role_obj', None) else None
 
+    # Shown exactly once: the POST that creates the account. Never read from
+    # the DB (which holds only a hash), never on GET/PATCH/PUT or refreshes.
+    temp_password = serializers.SerializerMethodField()
+
+    def get_temp_password(self, obj):
+        request = self.context.get('request')
+        method = (getattr(request, 'method', 'GET') or 'GET').upper()
+        if method == 'POST' and request and getattr(request, 'parser_context', None):
+            view = self.context.get('view')
+            action = getattr(view, 'action', None)
+            if action in (None, 'create'):
+                return getattr(obj, '_one_time_password', None)
+        return None
+
     class Meta:
         model = User
         fields = [
             'id', 'username', 'email', 'phone_number', 'role_obj', 'role_name', 'is_active',
-            'assignment_type', 'primary_outlet', 'primary_location', 'assigned_locations', 'password', 'temp_password',
-            'first_name', 'last_name', 'requires_password_change'
+            'assignment_type', 'primary_outlet', 'primary_location', 'assigned_locations', 'password',
+            'temp_password', 'first_name', 'last_name', 'requires_password_change'
         ]
         extra_kwargs = {
             'password': {'write_only': True, 'required': False},
-            'temp_password': {'read_only': True},
             'username': {'required': False},
             'email': {'required': False},
         }
@@ -173,15 +187,23 @@ class EmployeeSerializer(serializers.ModelSerializer):
         user = super().create(validated_data)
         if assigned:
             user.assigned_locations.set(assigned)
+        # Plaintext lives only in this response: the owner reads it once and
+        # hands it to the staff member. The DB keeps only an AnyPassword-style
+        # hash, so a leaked backup can never reveal a usable password.
+        one_time_plain = None
         if password:
             user.set_password(password)
-            user.temp_password = password
+            user.temp_password = make_password(password)
+            user.requires_password_change = True
+            one_time_plain = password
         else:
             default_pw = secrets.token_urlsafe(8)
             user.set_password(default_pw)
-            user.temp_password = default_pw
+            user.temp_password = make_password(default_pw)
             user.requires_password_change = True
+            one_time_plain = default_pw
         user.save()
+        user._one_time_password = one_time_plain
         return user
 
     def update(self, instance, validated_data):
@@ -192,7 +214,8 @@ class EmployeeSerializer(serializers.ModelSerializer):
             instance.assigned_locations.set(assigned)
         if password:
             instance.set_password(password)
-            instance.temp_password = password
+            instance.temp_password = make_password(password)
+            instance.requires_password_change = True
             instance.save()
         return instance
 
@@ -224,9 +247,18 @@ class RegisterSerializer(serializers.ModelSerializer):
         # Minimal format check: at least 6 digits to avoid garbage
         if sum(c.isdigit() for c in raw) < 6:
             raise serializers.ValidationError('Invalid phone number. / ဖုန်းနံပါတ် မမှန်ကန်ပါ။')
-        if User.objects.filter(phone_number=raw).exists():
+        ok, normalized_or_error = validate_myanmar_phone(raw)
+        if not ok:
+            raise serializers.ValidationError(normalized_or_error)
+        normalized = normalized_or_error
+        if User.objects.filter(phone_number=normalized).exists():
             raise serializers.ValidationError('This phone number is already registered. Please login.')
-        return raw
+        # Stored normalized (959xxxxxxxx) - exactly the format the login lookup
+        # uses. Previously the raw input was stored, so a shop registered with
+        # 09xxxxxxxx could never log back in by phone, and the duplicate check
+        # above compared '09...' with stored '959...' so it never matched
+        # (unlimited registrations for one number).
+        return normalized
 
     def validate(self, data):
         data.pop('password_confirm')
