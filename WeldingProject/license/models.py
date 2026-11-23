@@ -162,6 +162,35 @@ class PlanFeature(models.Model):
         ordering = ['sort_order', 'id']
 
 
+class TrialOrder(models.Model):
+    """Trial → paid checkout order (manual transfer until Dinger lands).
+
+    Customer picks a plan, pays via KPay/Wave transfer, uploads proof;
+    owner approves and a subscription AppLicense is issued. Dinger will
+    fill `dinger_txn_id` via webhook instead of manual proof.
+    """
+    STATUS = [
+        ('pending_payment', 'Pending payment'),
+        ('pending_review', 'Pending review'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+    plan = models.ForeignKey(SubscriptionPlan, on_delete=models.PROTECT, related_name='orders')
+    phone_number = models.CharField(max_length=20)
+    amount_mmk = models.PositiveIntegerField(default=0)
+    machine_id = models.CharField(max_length=255, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS, default='pending_payment', db_index=True)
+    payment_proof = models.CharField(max_length=255, blank=True)
+    transaction_id = models.CharField(max_length=100, blank=True)
+    dinger_txn_id = models.CharField(max_length=100, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'license_trial_order'
+        ordering = ['-created_at']
+
+
 class BackupAddOn(models.Model):
     """Sellable backup add-on: per-shop purchase granting cloud backup.
 

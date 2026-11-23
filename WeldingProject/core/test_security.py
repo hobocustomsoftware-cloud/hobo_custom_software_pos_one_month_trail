@@ -370,3 +370,48 @@ class BackupAddOnTest(TestCase):
         r = self.client.post("/api/license/backup/activate/", {"backup_key": "BACKUP-KEY-1"})
         self.assertEqual(r.status_code, 200, r.content)
         self.assertTrue(self.client.get("/api/license/backup/status/").json()["cloud_backup"])
+
+
+class TrialCheckoutTest(TestCase):
+    """Trial → paid: order → proof → approve → license."""
+
+    def setUp(self):
+        self.client = APIClient()
+        role, _ = Role.objects.get_or_create(name="owner")
+        self.owner = User.objects.create_user(
+            username="trial_owner", password="Trial-Owner-1",
+            phone_number="95945006677", role_obj=role,
+        )
+
+    def test_plans_carry_trial_cta(self):
+        body = self.client.get("/api/license/plans/").json()
+        self.assertIn("trial", body)
+        # Fresh DB starts on trial; an approved checkout moves it to licensed.
+        self.assertIn(body["trial"]["status"], ("trial", "grace", "blocked", "licensed"))
+
+    def test_full_checkout_round_trip(self):
+        order = self.client.post("/api/license/checkout/", {
+            "plan_code": "sub_basic", "phone_number": "09450011223",
+        })
+        self.assertEqual(order.status_code, 201, order.content)
+        order_id = order.json()["order_id"]
+        proof = self.client.post(f"/api/license/checkout/{order_id}/proof/",
+                                 {"transaction_id": "TXN123"})
+        self.assertEqual(proof.status_code, 200, proof.content)
+        self.client.force_authenticate(user=self.owner)
+        approved = self.client.post(f"/api/license/checkout/{order_id}/approve/")
+        self.assertEqual(approved.status_code, 200, approved.content)
+        self.assertEqual(approved.json()["license_type"], "sub_basic")
+
+    def test_approve_requires_manager(self):
+        order = self.client.post("/api/license/checkout/", {
+            "plan_code": "sub_basic", "phone_number": "09450011223",
+        })
+        order_id = order.json()["order_id"]
+        self.client.post(f"/api/license/checkout/{order_id}/proof/", {"transaction_id": "TXN1"})
+        role, _ = Role.objects.get_or_create(name="sale_staff")
+        staff = User.objects.create_user(username="t_staff", password="x-12345678",
+                                         phone_number="95945001199", role_obj=role)
+        self.client.force_authenticate(user=staff)
+        r = self.client.post(f"/api/license/checkout/{order_id}/approve/")
+        self.assertEqual(r.status_code, 403)

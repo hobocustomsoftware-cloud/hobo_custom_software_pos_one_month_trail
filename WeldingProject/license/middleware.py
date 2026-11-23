@@ -18,6 +18,8 @@ SKIP_LICENSE_PATHS = [
     '/api/license/status/',   # status ကိုယ်တိုင် (optional – no key required)
     '/api/license/activate/',
     '/api/license/remote-activate/',  # License server - EXE မှ ခေါ်ခြင်း
+    '/api/license/plans/',          # Trial → paid: pricing must show after expiry
+    '/api/license/checkout/',        # Trial → paid: order + proof without login
     '/api/core/register',     # စာရင်းသွင်းခြင်း - owner ဖန်တီးနိုင်ရန်
     '/api/core/auth/',        # Login – ဝင်ရောက်နိုင်ရန် (401 ကာကွယ်ရန်)
     '/api/core/shop-settings', # Login စာမျက်နှာ shop name/logo ပြရန်

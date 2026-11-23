@@ -201,12 +201,117 @@ class SubscriptionPlanListView(APIView):
         for defaults in DEFAULT_PLANS:
             SubscriptionPlan.objects.get_or_create(code=defaults['code'], defaults=defaults)
         plans = SubscriptionPlan.objects.filter(is_active=True).order_by('sort_order', 'id')
-        current = check_license_status().get('license_type')
+        lic = check_license_status()
         return Response({
             'plans': [_plan_payload(p) for p in plans],
-            'current_plan': current,
+            'current_plan': lic.get('license_type'),
+            # Trial → paid handoff: the app shows this CTA when the clock runs out.
+            'trial': {
+                'status': lic.get('status'),
+                'days_remaining': lic.get('days_remaining', 0),
+                'trial_expires_at': lic.get('trial_expires_at'),
+                'grace_expires_at': lic.get('grace_expires_at'),
+                'upgrade_required': lic.get('status') in ('grace', 'blocked', 'expired'),
+                'upgrade_message': 'Trial ကုန်ပါပြီ။ ဆက်သုံးရန် plan ရွေးပြီး payment လုပ်ပါ။' if lic.get('status') in ('grace', 'blocked', 'expired') else None,
+            },
             'backup_addon_available': True,
         })
+
+
+class TrialCheckoutView(APIView):
+    """Trial → paid: pick a plan, prove payment, get a license.
+
+    Flow (manual transfer until Dinger lands):
+    1. POST {plan_code} → order with amount + transfer instructions (KPay/Wave to shop owner account).
+    2. Customer pays, POST {order_id, payment_proof} → pending review.
+    3. Owner approves → AppLicense issued (subscription expiry set), app unlocks.
+    Dinger will replace steps 1-2 with a payment link + webhook.
+    """
+    permission_classes = [AllowAny]
+    throttle_classes = [LicenseActivateThrottle]
+
+    def post(self, request):
+        from .models import TrialOrder
+        plan_code = (request.data.get('plan_code') or '').strip()
+        phone = (request.data.get('phone_number') or '').strip()
+        if not plan_code or not phone:
+            return Response({'error': 'plan_code + phone_number required.'}, status=status.HTTP_400_BAD_REQUEST)
+        for defaults in DEFAULT_PLANS:
+            SubscriptionPlan.objects.get_or_create(code=defaults['code'], defaults=defaults)
+        try:
+            plan = SubscriptionPlan.objects.get(code=plan_code, is_active=True)
+        except SubscriptionPlan.DoesNotExist:
+            return Response({'error': 'Unknown plan.'}, status=status.HTTP_400_BAD_REQUEST)
+        order = TrialOrder.objects.create(
+            plan=plan, phone_number=phone, amount_mmk=plan.price_mmk,
+            machine_id=get_machine_id(), status='pending_payment',
+        )
+        return Response({
+            'order_id': order.id,
+            'plan': _plan_payload(plan),
+            'amount_mmk': order.amount_mmk,
+            'pay_to': {
+                'kpay': '0979-XXX-XXXX (HoBo)', 'wave': '0979-XXX-XXXX (HoBo)',
+                'note': f'Order #{order.id} {phone}',
+            },
+            'next': f'Pay, then POST /api/license/checkout/{order.id}/proof/ with payment screenshot.',
+        }, status=status.HTTP_201_CREATED)
+
+
+class TrialCheckoutProofView(APIView):
+    """Attach payment proof to a trial order (customer side)."""
+    permission_classes = [AllowAny]
+    throttle_classes = [LicenseActivateThrottle]
+
+    def post(self, request, order_id):
+        from .models import TrialOrder
+        try:
+            order = TrialOrder.objects.get(pk=order_id, status='pending_payment')
+        except TrialOrder.DoesNotExist:
+            return Response({'error': 'Order not found or already submitted.'}, status=status.HTTP_404_NOT_FOUND)
+        proof = request.FILES.get('payment_proof') or request.data.get('payment_proof')
+        txn = (request.data.get('transaction_id') or '').strip()
+        if not proof and not txn:
+            return Response({'error': 'payment_proof file or transaction_id required.'}, status=status.HTTP_400_BAD_REQUEST)
+        if hasattr(proof, 'size') and proof.size > 5 * 1024 * 1024:
+            return Response({'error': 'File must be less than 5MB.'}, status=status.HTTP_400_BAD_REQUEST)
+        if hasattr(proof, 'read'):
+            from django.core.files.storage import default_storage
+            path = default_storage.save(f'trial_orders/{order.id}_{proof.name}', proof)
+            order.payment_proof = path
+        order.transaction_id = txn
+        order.status = 'pending_review'
+        order.save()
+        try:
+            from core.external_sync import _send_telegram
+            _send_telegram(f'New trial payment: Order #{order.id} {order.plan.code} {order.amount_mmk}Ks {order.phone_number}')
+        except Exception:
+            pass
+        return Response({'message': 'Proof received. We will activate within 24h.', 'order_id': order.id})
+
+
+class TrialCheckoutApproveView(APIView):
+    """Owner approves a paid order → license issued (Manager+)."""
+
+    def post(self, request, order_id):
+        from datetime import timedelta
+        from core.permissions import is_manager_or_higher
+        from .models import TrialOrder
+        if not is_manager_or_higher(request.user):
+            return Response({'error': 'Owner/Manager only.'}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            order = TrialOrder.objects.get(pk=order_id, status='pending_review')
+        except TrialOrder.DoesNotExist:
+            return Response({'error': 'Order not found or not ready.'}, status=status.HTTP_404_NOT_FOUND)
+        months = 1
+        lic = AppLicense.objects.create(
+            license_type=order.plan.code, machine_id=order.machine_id or get_machine_id(),
+            is_active=True, expires_at=timezone.now() + timedelta(days=30 * months),
+            notes=f'trial order #{order.id} {order.phone_number}',
+        )
+        order.status = 'approved'
+        order.save()
+        return Response({'message': 'License activated.', 'license_type': lic.license_type, 'expires_at': lic.expires_at.isoformat()})
 
 
 class BackupStatusView(APIView):
