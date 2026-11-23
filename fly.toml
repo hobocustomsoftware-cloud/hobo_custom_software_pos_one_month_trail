@@ -1,14 +1,26 @@
+# fly.toml app configuration file generated for hobo-custom-software-pos-one-month-trail on 2026-11-23T15:33:58Z
+#
+# See https://docs.fly.io/reference/configuration for information about how to use this file.
+#
+
 app = 'hobo-custom-software-pos-one-month-trail'
 primary_region = 'ams'
 
 [build]
   dockerfile = 'compose/Dockerfile.unified'
+
   [build.args]
     VITE_API_URL = '/api'
     VITE_BASE = '/app/'
 
 [deploy]
   release_command = 'python manage.py migrate --noinput'
+
+[env]
+  DEPLOYMENT_MODE = 'hosted'
+  DJANGO_DEBUG = 'False'
+  PORT = '8000'
+  SKIP_LICENSE = 'true'
 
 [http_service]
   internal_port = 8000
@@ -19,14 +31,13 @@ primary_region = 'ams'
   processes = ['app']
 
   [[http_service.checks]]
-    grace_period = '40s'
     interval = '30s'
+    timeout = '10s'
+    grace_period = '40s'
     method = 'GET'
     path = '/health/'
-    timeout = '10s'
 
-[env]
-  DJANGO_DEBUG = 'False'
-  DEPLOYMENT_MODE = 'hosted'
-  SKIP_LICENSE = 'true'
-  PORT = '8000'
+[[vm]]
+  memory = '1gb'
+  cpu_kind = 'shared'
+  cpus = 1
