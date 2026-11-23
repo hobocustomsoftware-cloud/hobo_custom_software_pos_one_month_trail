@@ -50,31 +50,12 @@ def _should_skip_trial_check(path):
 
 
 class TrialExpiryMiddleware(MiddlewareMixin):
-    """
-    After license check: if trial expired, block all POS/Inventory APIs.
-    Return 403 with message "Trial Expired. Contact Admin to Activate."
+    """Legacy entry point: the real check now lives in
+    license.middleware._unified_access_check so license + trial can never
+    disagree (previously only one of the two middlewares could be active and
+    each had its own skip rules). Kept as a no-op for MIDDLEWARE lists that
+    still reference it; remove it from settings once deployed.
     """
 
     def process_request(self, request):
-        path = request.path
-        if _should_skip_trial_check(path):
-            return None
-        if not path.startswith('/api/'):
-            return None
-        # Demo / dev: skip trial expiry so လက်ရှိအနေအထားနဲ့ demo တစ်လလောက် သုံးလို့ရမယ်
-        if os.environ.get('SKIP_LICENSE', 'false').lower() in ('true', '1', 'yes'):
-            return None
-        if os.environ.get('DEPLOYMENT_MODE', '').strip().lower() == 'hosted':
-            return None
-        if not _trial_expired():
-            return None
-        contact = os.environ.get(
-            'TRIAL_EXPIRED_CONTACT',
-            'Contact Admin to activate. / သက်တမ်းတိုးချဲ့ရန် အက်ဒ်မင်နှင့် ဆက်သွယ်ပါ။'
-        )
-        return JsonResponse({
-            'error': 'trial_expired',
-            'message': 'Trial Expired. Contact Admin to Activate.',
-            'detail': 'This instance has exceeded the 30-day trial period.',
-            'contact': contact,
-        }, status=403)
+        return None

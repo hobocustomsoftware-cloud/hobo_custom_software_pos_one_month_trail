@@ -37,6 +37,7 @@ from core.permissions import (
     is_cashier_role,
 )
 from core.audit import log_audit
+from core.throttling import PublicLookupThrottle
 from core.outlet_utils import filter_queryset_by_outlet, is_owner, get_request_outlet_id, get_shop_outlet_ids, user_can_access_location
 from rest_framework import serializers
 import logging
@@ -77,13 +78,13 @@ class CategoryViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         qs = Category.objects.all().order_by('name')
         shop_id = getattr(self.request.user, "shop_id", None)
-        print(f"DEBUG: User Shop ID: {shop_id}")
+        logger.debug("CategoryViewSet user shop_id=%s", shop_id)
         if shop_id is not None:
             qs = qs.filter(shop_id=shop_id)
         elif not is_owner(self.request.user):
             return qs.none()
         count = qs.count()
-        print(f"DEBUG: CategoryViewSet queryset count: {count}")
+        logger.debug("CategoryViewSet queryset count=%s", count)
         return qs
 
     def perform_create(self, serializer):
@@ -292,8 +293,9 @@ class ProductImportPreviewView(APIView):
 class ProductBulkImportView(APIView):
     """
     Bulk import products from Excel/CSV.
-    TODO: Implement Celery background tasks for massive Excel imports to avoid blocking
-    the main thread and prevent server crashes (SRE: non-blocking bulk import).
+    Small files (<=500 rows) import inline. Larger files go to the Celery
+    worker (`inventory.bulk_import_products`) and return 202 with a task id,
+    so a massive Excel can never block the request thread (SRE).
     POST: multipart/form-data with `file` (Excel or CSV) and `mapping` (JSON string).
     mapping example: {"Model": "model_no", "Product Name": "name", "SKU": "sku", "Price": "retail_price", "Qty": "quantity"}
     - If model_no exists: update stock (inbound movement). Requires optional `location_id` for stock.
@@ -301,6 +303,8 @@ class ProductBulkImportView(APIView):
     Returns: { "imported", "updated", "failed", "errors": [{"row", "reason"}] }
     """
     permission_classes = [IsInventoryManagerOrHigher]
+
+    INLINE_ROW_LIMIT = 500
 
     def _safe_decimal(self, val, default=None):
         if val is None or (isinstance(val, float) and __import__('math').isnan(val)):
@@ -374,6 +378,28 @@ class ProductBulkImportView(APIView):
                 'imported': 0, 'updated': 0, 'failed': 0,
                 'errors': [{'row': 0, 'reason': 'File has no rows.'}],
             }, status=status.HTTP_200_OK)
+
+        # Large files: hand to the worker, never block this thread.
+        try:
+            row_count = int(len(df))
+        except Exception:
+            row_count = self.INLINE_ROW_LIMIT + 1
+        if row_count > self.INLINE_ROW_LIMIT:
+            from .tasks import bulk_import_products
+            payload = {
+                'rows': df.to_dict(orient='records'),
+                'columns': [str(c) for c in df.columns],
+                'mapping': mapping,
+                'location_id': int(location_id) if location_id else None,
+            }
+            try:
+                task = bulk_import_products.delay(payload, request.user.id)
+                return Response({
+                    'accepted': True, 'task_id': task.id, 'rows': row_count,
+                    'message': f'{row_count} rows queued for background import.',
+                }, status=status.HTTP_202_ACCEPTED)
+            except Exception:
+                pass  # no worker running: fall through to inline import
 
         # Rename columns by mapping (excel_col -> our field name)
         rename = {}
@@ -2019,6 +2045,7 @@ class SerialItemUpdateView(generics.UpdateAPIView):
 class WarrantyCheckView(APIView):
     """Serial Number ဖြင့် Warranty စစ်ဆေးခြင်း - GET /api/warranty/check/?serial_number=SN-xxx (Public)"""
     permission_classes = [permissions.AllowAny]  # Customer များ စစ်ဆေးနိုင်ရန်
+    throttle_classes = [PublicLookupThrottle]
 
     def get(self, request):
         serial_number = request.query_params.get('serial_number', '').strip()
@@ -2081,7 +2108,17 @@ class WarrantyExpiringSoonView(generics.ListAPIView):
 #               Dashboard Views
 #-----------------------------------------------------------------
 class DashboardAnalyticsView(APIView):
-    """Dashboard: Role ရှိသူအားလုံး ကြည့်နိုင် (role အလိုက် stats/charts ပြမည်)."""
+    """One dashboard URL for every role, each role seeing only its own scope.
+
+    Why this shape (documented because the old docs said 'manager-only'): the
+    POS needs one dashboard screen for all staff. Owners/managers see
+    shop-wide totals and P&L; cashiers and floor staff see ONLY their own
+    sales (staff=<me>) inside their own outlet, never colleagues' rows and
+    never cost/profit figures. Non-owners are pinned to primary_outlet_id
+    and any ?outlet_id= they pass is ignored. Repair/installation aggregates
+    below are still shop-wide counts (no per-staff owner on those rows) -
+    that is the one documented exception, not per-person data.
+    """
     permission_classes = [IsStaffOrHigher]
 
     def get(self, request):
@@ -2200,12 +2237,25 @@ class DashboardAnalyticsView(APIView):
         gs_i = GlobalSetting.objects.filter(key='enable_installation').first()
         if gs_i and (gs_i.value or '').strip().lower() in ('0', 'false', 'no'):
             enable_installation = False
-        active_repairs = RepairService.objects.exclude(status__in=['completed', 'cancelled']).count() if enable_service else 0
+        # Outlet-scoped: staff see only their own shop's repairs/jobs, never other shops'.
+        # RepairService reaches the outlet through location__outlet; InstallationJob
+        # through sale_transaction__outlet (both nullable, so unscoped rows are
+        # visible to privileged roles but hidden from floor staff).
+        repair_scope = RepairService.objects.all()
+        if enable_service:
+            if outlet_id is not None:
+                repair_scope = repair_scope.filter(location__outlet_id=outlet_id)
+            if role_name not in ('admin', 'owner', 'super_admin', 'manager'):
+                repair_scope = repair_scope.filter(staff=user)
+        active_repairs = repair_scope.exclude(status__in=['completed', 'cancelled']).count() if enable_service else 0
         installation_jobs_count = 0
         if enable_installation:
             try:
                 from installation.models import InstallationJob
-                installation_jobs_count = InstallationJob.objects.count()
+                jobs_qs = InstallationJob.objects.all()
+                if outlet_id is not None:
+                    jobs_qs = jobs_qs.filter(sale_transaction__outlet_id=outlet_id)
+                installation_jobs_count = jobs_qs.count()
             except Exception:
                 pass
 
@@ -2262,6 +2312,8 @@ class DashboardAnalyticsView(APIView):
         if outlet_id is not None:
             sales_f &= Q(outlet_id=outlet_id)
         service_f = Q()
+        if outlet_id is not None:
+            service_f &= Q(location__outlet_id=outlet_id)
         # Location reverse: SaleTransaction.sale_location → Location.saletransaction_set (Django default)
         loc_sales_f = Q(saletransaction_set__status='approved')
         if outlet_id is not None:
@@ -2286,6 +2338,8 @@ class DashboardAnalyticsView(APIView):
             pending_qs = pending_qs.filter(outlet_id=outlet_id)
         pending_sales = pending_qs.count()
         all_services = RepairService.objects.filter(service_f)
+        if role_name not in ('admin', 'owner', 'super_admin', 'manager'):
+            all_services = all_services.filter(staff=user)
         cancelled_qs = SaleTransaction.objects.filter(status='cancelled')
         if outlet_id is not None:
             cancelled_qs = cancelled_qs.filter(outlet_id=outlet_id)
@@ -2338,9 +2392,12 @@ class DashboardAnalyticsView(APIView):
         if not is_owner(user):
             outlet_id = getattr(user, "primary_outlet_id", None)
         activities = []
-        sales_qs = SaleTransaction.objects.all().select_related('staff').order_by('-created_at')[:5]
+        sales_qs = SaleTransaction.objects.all().select_related('staff').order_by('-created_at')
         if outlet_id is not None:
             sales_qs = sales_qs.filter(outlet_id=outlet_id)
+        if role_name not in ('admin', 'owner', 'super_admin', 'manager'):
+            sales_qs = sales_qs.filter(staff=user)
+        sales_qs = sales_qs[:5]
         for s in sales_qs:
             activities.append({
                 "id": s.id,
@@ -2353,7 +2410,12 @@ class DashboardAnalyticsView(APIView):
                 "status": s.status.capitalize(),
             })
 
-        repairs = RepairService.objects.all().select_related('staff').order_by('-created_at')[:5]
+        repairs = RepairService.objects.all().select_related('staff').order_by('-created_at')
+        if outlet_id is not None:
+            repairs = repairs.filter(location__outlet_id=outlet_id)
+        if role_name not in ('admin', 'owner', 'super_admin', 'manager'):
+            repairs = repairs.filter(staff=user)
+        repairs = repairs[:5]
         for r in repairs:
             activities.append({
                 "id": f"repair-{r.id}",
@@ -2484,10 +2546,15 @@ class PaymentProofUploadView(generics.UpdateAPIView):
     queryset = SaleTransaction.objects.all()
     serializer_class = PaymentProofUploadSerializer
     permission_classes = [IsAuthenticated]
-    
+
+    def get_queryset(self):
+        # Outlet-scoped: staff of shop B get 404 on shop A's sales.
+        from core.outlet_utils import filter_queryset_by_outlet
+        return filter_queryset_by_outlet(super().get_queryset(), self.request)
+
     def update(self, request, *args, **kwargs):
         sale = self.get_object()
-        
+
         # Sale staff who created the sale can upload, or admin/manager
         if sale.staff != request.user:
             # Check if user is admin/manager
@@ -2539,10 +2606,14 @@ class PaymentProofUploadView(generics.UpdateAPIView):
 
 
 class PaymentStatusUpdateView(generics.UpdateAPIView):
-    """Update payment status for a sale"""
+    """Update payment status for a sale (Admin+ of the same outlet)."""
     queryset = SaleTransaction.objects.all()
     serializer_class = PaymentStatusUpdateSerializer
     permission_classes = [IsAdminOrHigher]
+
+    def get_queryset(self):
+        from core.outlet_utils import filter_queryset_by_outlet
+        return filter_queryset_by_outlet(super().get_queryset(), self.request)
     
     def update(self, request, *args, **kwargs):
         sale = self.get_object()

@@ -5,9 +5,20 @@ from rest_framework.throttling import SimpleRateThrottle
 
 
 def _get_ip(request):
+    """Client IP used to key every per-IP throttle (login, license activation).
+
+    Takes the RIGHT-most X-Forwarded-For hop, not the left-most: the left-hand
+    entries are client supplied, so `X-Forwarded-For: 1.2.3.4, 5.6.7.8` used
+    to give an attacker an IP per request and defeat all rate limits (brute
+    force login, license-key guessing). A proxy appends the peer address it
+    actually saw, so the last entry is the only trustworthy one.
+    Falls back to REMOTE_ADDR when there is no proxy / no header.
+    """
     xff = request.META.get('HTTP_X_FORWARDED_FOR')
     if xff:
-        return xff.split(',')[0].strip()
+        hops = [h.strip() for h in xff.split(',') if h.strip()]
+        if hops:
+            return hops[-1]
     return request.META.get('REMOTE_ADDR', '127.0.0.1')
 
 
@@ -27,6 +38,15 @@ class RemoteLicenseThrottle(SimpleRateThrottle):
 
     def get_cache_key(self, request, view):
         return f'remote_license_{_get_ip(request)}'
+
+
+class PublicLookupThrottle(SimpleRateThrottle):
+    """Public repair/warranty tracking - 30/min per IP (guessable IDs)."""
+    scope = 'public_lookup'
+    rate = '30/min'
+
+    def get_cache_key(self, request, view):
+        return f'public_lookup_{_get_ip(request)}'
 
 
 class AuthThrottle(SimpleRateThrottle):

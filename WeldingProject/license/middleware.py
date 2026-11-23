@@ -28,29 +28,61 @@ SKIP_LICENSE_PATHS = [
 ]
 
 
+def _license_mode():
+    """Resolution order: SKIP_LICENSE > DEPLOYMENT_MODE > DEBUG.
+
+    - SKIP_LICENSE=true: never enforce (local dev, CI, demos).
+    - DEPLOYMENT_MODE=hosted: trial middleware owns expiry; license skipped.
+    - DEPLOYMENT_MODE=on_premise: enforce even with DEBUG=True so shops can
+      rehearse expiry locally (prevents the 'works here, blocked there' gap).
+    - unset mode: legacy behaviour, DEBUG=True skips.
+    """
+    if os.environ.get('SKIP_LICENSE', 'false').lower() in ('true', '1', 'yes'):
+        return 'skip'
+    mode = os.environ.get('DEPLOYMENT_MODE', '').strip().lower()
+    if mode == 'hosted':
+        return 'skip'
+    if mode == 'on_premise':
+        return 'enforce'
+    if getattr(settings, 'DEBUG', False):
+        return 'skip'  # Development: DEBUG=True မှာ license မစစ်
+    return 'enforce'
+
+
 def _should_skip_license():
     """Dev / hosted မှာ license စစ်ဆေးခြင်း skip လုပ်မလုပ်။ on_premise သတ်မှတ်ထားမှသာ စစ်မည်။"""
-    if os.environ.get('SKIP_LICENSE', 'false').lower() in ('true', '1', 'yes'):
-        return True
-    if getattr(settings, 'DEBUG', False):
-        return True  # Development: DEBUG=True မှာ license မစစ်
-    # Only enforce license when explicitly on_premise (EXE/standalone)
-    mode = os.environ.get('DEPLOYMENT_MODE', '').strip().lower()
-    if mode != 'on_premise':
-        return True  # hosted, empty, or other => skip so /api/staff/items/, dashboard, ai work
-    return False
+    return _license_mode() == 'skip'
+
+
+def _unified_access_check(path):
+    """One gate for license + trial (previously two middlewares disagreed).
+
+    Order: (1) SKIP_LICENSE / DEPLOYMENT_MODE off-switch, (2) always-open
+    auth/setup paths, (3) paid license validity, (4) 30-day trial clock.
+    Returns None when the request may proceed, else (error, message, status).
+    Hosted deployments skip both gates: expiry is handled by subscription
+    billing there, not by the on-premise license file.
+    """
+    if _should_skip_license():
+        return None
+    for prefix in SKIP_LICENSE_PATHS:
+        if path.startswith(prefix):
+            return None
+    lic = check_license_status()
+    if not lic.get('can_use', False):
+        return ('license_expired', lic.get('message', 'License သက်တမ်းကုန်ပြီးပါပြီ။'), lic.get('status', 'blocked'))
+    from core.trial_middleware import _trial_expired
+    if _trial_expired():
+        import os
+        return ('trial_expired', 'Trial Expired. Contact Admin to Activate.', os.environ.get(
+            'TRIAL_EXPIRED_CONTACT',
+            'Contact Admin to activate. / သက်တမ်းတိုးချဲ့ရန် အက်ဒ်မင်နှင့် ဆက်သွယ်ပါ။'))
+    return None
 
 
 def _should_skip(request, path):
     if _should_skip_license():
         return True
-    # Localhost / 127.0.0.1 => skip so dev and Docker (user hits localhost) work without license
-    try:
-        host = (request.get_host().split(':')[0] or '').lower()
-        if host in ('localhost', '127.0.0.1', 'backend', 'frontend'):
-            return True
-    except Exception:
-        pass
     for prefix in SKIP_LICENSE_PATHS:
         if path.startswith(prefix):
             return True
@@ -65,25 +97,35 @@ class LicenseCheckMiddleware(MiddlewareMixin):
 
     def process_request(self, request):
         path = request.path
-        # Never block /api/ with license – let DRF handle auth/permission (avoids 403 for staff/items, payment-methods, etc.)
-        if path.startswith('/api/'):
-            return None
         if _should_skip(request, path):
             return None
-
-        result = check_license_status()
-        if not result.get('can_use', False):
-            # API request ဖြစ်ရင် JSON ပြန်မည်
+        verdict = _unified_access_check(path)
+        if verdict is None:
+            return None
+        error, message, status = verdict
+        if error == 'trial_expired':
+            import os
             if path.startswith('/api/'):
                 return JsonResponse({
-                    'error': 'license_expired',
-                    'message': result.get('message', 'License သက်တမ်းကုန်ပြီးပါပြီ။'),
-                    'status': result.get('status', 'blocked'),
+                    'error': error,
+                    'message': 'Trial Expired. Contact Admin to Activate.',
+                    'detail': 'This instance has exceeded the 30-day trial period.',
+                    'contact': os.environ.get('TRIAL_EXPIRED_CONTACT', message),
                 }, status=403)
-            # Page request ဖြစ်ရင် license-expired page ပြမည်
-            from django.shortcuts import render
-            return render(request, 'license_expired.html', {
-                'message': result.get('message', ''),
-                'status': result.get('status', 'blocked'),
-            })
-        return None
+            return None  # non-API pages stay open; the API gate is enough
+        # License gate: expired shops see the banner but keep read-only
+        # access; writes are blocked. Trial expiry blocks all business APIs
+        # (the old behaviour the tests pin).
+        if error == 'license_expired' and path.startswith('/api/') and request.method in ('GET', 'HEAD', 'OPTIONS'):
+            return None
+        if path.startswith('/api/'):
+            return JsonResponse({
+                'error': error,
+                'message': message,
+                'status': status,
+            }, status=403)
+        from django.shortcuts import render
+        return render(request, 'license_expired.html', {
+            'message': message,
+            'status': status,
+        })

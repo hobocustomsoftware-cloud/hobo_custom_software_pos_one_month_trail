@@ -10,7 +10,8 @@ from rest_framework.response import Response
 from django.conf import settings
 from .models import User, Role, StaffSession, ShopSettings, Outlet, Shift
 from .serializers import UserSerializer, EmployeeSerializer, RoleSerializer, RegisterSerializer, ShopSettingsSerializer, ShiftSerializer
-from .permissions import IsAdminOrHigher, IsOwner, IsStaffOrHigher
+from .permissions import IsAdminOrHigher, IsOwner, IsStaffOrHigher, IsManagerOrHigher
+from .phone_utils import find_user_by_phone
 from .outlet_utils import get_visible_outlets, is_owner
 from .auth_views import get_tokens_for_user, _build_user_payload
 
@@ -40,18 +41,22 @@ class RegisterView(generics.CreateAPIView):
             logger.exception("Register failed: %s", e)
             raise
         shop_name = (request.data.get('shop_name') or '').strip()
-        # Marketing: Telegram + Google Sheet. Run sync in request so it works without Celery worker.
-        try:
-            from .external_sync import sync_new_registration
-            sync_new_registration(user, shop_name=shop_name)
-        except Exception as e2:
-            logging.getLogger(__name__).warning("Registration marketing sync failed: %s", e2)
-        # Optional: also queue for Celery if worker is running (no duplicate send; task is idempotent by design)
+        # Marketing: Telegram + Google Sheet. Prefer the Celery worker so the
+        # signup response is never blocked by network I/O; fall back to an
+        # inline sync when no worker is running (EXE / single-process dev).
+        queued = False
         try:
             from .tasks import sync_new_signup_marketing
             sync_new_signup_marketing.delay(user.id, shop_name)
-        except Exception as e:
-            pass  # already synced above; worker optional
+            queued = True
+        except Exception:
+            queued = False
+        if not queued:
+            try:
+                from .external_sync import sync_new_registration
+                sync_new_registration(user, shop_name=shop_name)
+            except Exception as e2:
+                logging.getLogger(__name__).warning("Registration marketing sync failed: %s", e2)
         # စာရင်းသွင်းသူတိုင်း သူ့ဆိုင်ရဲ့ Owner ဖြစ်သွားပြီး ချက်ချင်း ဝင်လို့ရသည်။
         can_login_now = True
         msg = 'Registration successful. You can sign in now.'
@@ -121,8 +126,16 @@ class ShiftViewSet(viewsets.ModelViewSet):
 
 
 class ForgotPasswordView(APIView):
-    """စကားဝှက် မေ့သွားပါက - Username သို့မဟုတ် Phone Number ဖြင့် Reset Token ရယူခြင်း"""
-    permission_classes = [AllowAny]
+    """စကားဝှက် ပြန်သတ်မှတ်ရန် Reset Token တောင်းခံခြင်း – Manager tier သာ။
+
+    SECURITY: was `AllowAny`, so an anonymous caller who knew any username or
+    phone number received a working signed token in the response body - full
+    account takeover, Owner included. This offline POS has no email/SMS channel
+    that can prove ownership, so only the people who already manage staff
+    passwords (Owner/Admin/Manager) may request one - the same authority
+    EmployeeViewSet already grants them.
+    """
+    permission_classes = [IsAuthenticated, IsManagerOrHigher]
 
     def post(self, request):
         username = request.data.get('username', '').strip()
@@ -135,7 +148,8 @@ class ForgotPasswordView(APIView):
             from .phone_utils import validate_myanmar_phone
             ok, norm = validate_myanmar_phone(phone_raw, country_code)
             if ok:
-                user = User.objects.filter(phone_number=norm, is_active=True).first()
+                # canonical form first, legacy 11-char rows as a fallback
+                user = find_user_by_phone(User.objects.filter(is_active=True), norm)
             if not user:
                 return Response({'error': 'ဤ ဖုန်းနံပါတ် မရှိပါ။'}, status=status.HTTP_404_NOT_FOUND)
         else:
@@ -146,18 +160,36 @@ class ForgotPasswordView(APIView):
         signer = Signer()
         payload = f'{user.id}:{(timezone.now() + timedelta(hours=1)).timestamp()}'
         token = signer.sign(payload)
+        reset_url = f'/app/reset-password?token={quote(token)}'
+        # No self-service: the token is delivered to the shop owner over the
+        # already-integrated Telegram channel, never to the reset requester.
+        # Without this, anyone who knows a username/phone gets a working
+        # token in the response and takes over the account (incl. Owner).
+        delivered = False
+        try:
+            from .external_sync import send_password_reset_alert
+            delivered = send_password_reset_alert(user, reset_url)
+        except Exception:
+            delivered = False
+        if not delivered:
+            return Response({
+                'error': 'Reset link could not be delivered (Telegram not configured). Ask the shop owner to reset it manually.',
+            }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
         return Response({
-            'token': token,
-            'reset_url': f'/app/reset-password?token={quote(token)}',
-            'message': 'စကားဝှက် ပြန်လည်သတ်မှတ်ရန် အောက်ပါ link ကို သုံးပါ။ (၁ နာရီအတွင်း အသုံးပြုရမည်)',
+            'message': 'Reset link sent to the shop owner via Telegram. (၁ နာရီအတွင်း အသုံးပြုရမည်)',
+            'delivered': True,
         }, status=status.HTTP_200_OK)
 
 
 
 
 class ResetPasswordView(APIView):
-    """Token ဖြင့် စကားဝှက် ပြန်သတ်မှတ်ခြင်း"""
-    permission_classes = [AllowAny]
+    """Token ဖြင့် စကားဝှက် ပြန်သတ်မှတ်ခြင်း – token ကို ထုတ်ပေးသူနှင့်အတူ manager tier သာ။
+
+    Sharing ForgotPasswordView's gate so a leaked/stale token cannot be redeemed
+    by an unauthenticated caller from outside the shop.
+    """
+    permission_classes = [IsAuthenticated, IsManagerOrHigher]
 
     def post(self, request):
         token = request.data.get('token', '').strip()

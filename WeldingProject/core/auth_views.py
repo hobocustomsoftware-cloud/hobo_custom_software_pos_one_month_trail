@@ -18,7 +18,7 @@ from django.conf import settings as django_settings
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import User, LoginFailAttempt
-from .phone_utils import validate_myanmar_phone
+from .phone_utils import validate_myanmar_phone, find_user_by_phone
 from .throttling import AuthThrottle
 
 # Lockout after 5 failures for 15 minutes
@@ -162,8 +162,11 @@ class UnifiedLoginView(APIView):
 
         # Find user by phone or email (indexed for performance); select_related to avoid 500 on role/outlet access
         qs = User.objects.filter(is_active=True).select_related("role_obj", "primary_outlet")
-        user = qs.filter(phone_number=normalized_phone).first()
-        not_found_detail = "No active account found with this phone number."
+        # canonical form first, legacy 11-char rows (old truncating normalizer) as fallback
+        user = find_user_by_phone(qs, normalized_phone)
+        # Same message as a wrong password: otherwise an anonymous caller can
+        # enumerate which phone numbers have an account on this instance.
+        not_found_detail = "Invalid login or password."
 
         if not user:
             self._record_failure(lockout_key, attempt)
@@ -272,7 +275,7 @@ class CustomTokenObtainView(APIView):
                     {"detail": "Phone number is required. / ဖုန်းနံပါတ် ထည့်ပါ။"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            user = User.objects.filter(phone_number=normalized_phone, is_active=True).first()
+            user = find_user_by_phone(User.objects.filter(is_active=True), normalized_phone)
             if user and not user.check_password(password):
                 user = None
         elif username:

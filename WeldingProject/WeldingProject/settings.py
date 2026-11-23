@@ -15,6 +15,7 @@ from pathlib import Path
 from datetime import timedelta
 
 import environ
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -36,17 +37,48 @@ if _env_file.exists():
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-9_p1uorl3hht-aeu@f4-oy)i44nb-+9z2yce@v_n=r$321#-*^')
-
 # SECURITY WARNING: don't run with debug turned on in production!
+# Two profiles, one variable: unset/True = local dev (DEBUG on, open hosts);
+# DJANGO_DEBUG=0/False = production shape (DEBUG off, host-validated,
+# secrets mandatory). Smoke-test prod locally with:
+#   DJANGO_DEBUG=0 DJANGO_SECRET_KEY=$(python -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())') python manage.py check --deploy
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() in ('true', '1', 'yes')
 
-# ALLOWED_HOSTS: demo server allows all domains/IPs; override with DJANGO_ALLOWED_HOSTS if needed
-# _raw = os.environ.get('DJANGO_ALLOWED_HOSTS', '')
-# _allowed = [h.strip() for h in _raw.split(',') if h.strip()]
-# ALLOWED_HOSTS = _allowed if _allowed else ['*']
-ALLOWED_HOSTS = ['pos.hobocustomsoftware.com', '.googleusercontent.com', 'localhost', '127.0.0.1', '*']
+# Demo / low-resource: single backend for all shops; subdomain → outlet; restrict admin for demo owners
+DEMO_MODE = os.environ.get('DEMO_MODE', 'False').lower() in ('true', '1', 'yes')
+
+# SECURITY WARNING: keep the secret key used in production secret!
+# The old fallback was a key committed to the repository: anyone with the source
+# could forge JWTs / sessions / password-reset tokens of a production instance.
+# Development keeps a convenient throwaway key; production must provide one.
+_INSECURE_DEV_KEY = 'django-insecure-9_p1uorl3hht-aeu@f4-oy)i44nb-+9z2yce@v_n=r$321#-*^'
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY') or (_INSECURE_DEV_KEY if DEBUG else '')
+if not SECRET_KEY:
+    raise ImproperlyConfigured(
+        'DJANGO_SECRET_KEY is not set and DEBUG is off. Export a unique secret '
+        '(python -c "from django.core.management.utils import get_random_secret_key; '
+        'print(get_random_secret_key())") via .env / process environment.'
+    )
+
+# ALLOWED_HOSTS: '*' disables Host-header validation entirely (cache poisoning,
+# poisoned links, cross-tenant password-reset links). Dev and the shared demo
+# server keep the permissive behaviour; anything running with DEBUG=0 for real
+# customers is host-validated unless DJANGO_ALLOWED_HOSTS overrides it.
+_raw_host = os.environ.get('DJANGO_ALLOWED_HOSTS', '')
+_allowed_hosts = [h.strip() for h in _raw_host.split(',') if h.strip()]
+if _allowed_hosts:
+    ALLOWED_HOSTS = _allowed_hosts
+elif DEBUG or DEMO_MODE:
+    ALLOWED_HOSTS = ['*']
+else:
+    ALLOWED_HOSTS = [
+        'pos.hobocustomsoftware.com',
+        '.hobocustomsoftware.com',
+        '.googleusercontent.com',
+        '.railway.app',
+        'localhost',
+        '127.0.0.1',
+    ]
 # External integrations (from .env in production)
 TELEGRAM_BOT_TOKEN = env('TELEGRAM_BOT_TOKEN')
 TELEGRAM_CHAT_ID = env('TELEGRAM_CHAT_ID')
@@ -55,13 +87,11 @@ GOOGLE_SHEETS_SHEET_NAME = env('GOOGLE_SHEETS_SHEET_NAME')
 # GOOGLE_SHEETS_JSON is the .env var name; Django uses GOOGLE_SHEETS_CREDENTIALS_JSON (path to service account JSON)
 GOOGLE_SHEETS_CREDENTIALS_JSON = env('GOOGLE_SHEETS_CREDENTIALS_JSON') or env('GOOGLE_SHEETS_JSON')
 
-# Demo / low-resource: single backend for all shops; subdomain → outlet; restrict admin for demo owners
-DEMO_MODE = os.environ.get('DEMO_MODE', 'False').lower() in ('true', '1', 'yes')
-
 # --- Demo server deployment (proxy + HTTPS, no redirect loop, API POSTs) ---
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SECURE_SSL_REDIRECT = False  # Proxy handles HTTPS; avoid ERR_TOO_MANY_REDIRECTS
-APPEND_SLASH = False  # Avoid redirect on POST so request body is not lost
+# NOTE: APPEND_SLASH used to be set to False here *and* re-set to True at the end
+# of this file (last write wins). The effective value is True; see bottom of file.
 
 # Fix AutoField warnings
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
@@ -101,11 +131,15 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    # CorsMiddleware must run BEFORE anything that can short-circuit a request
+    # (security/license/trial) or emit a response (CommonMiddleware), otherwise
+    # 4xx/5xx responses leave the API without Access-Control-Allow-* headers
+    # and the SPA shows a misleading opaque "network error".
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',  # Serve static (DRF browsable API CSS, admin) in Docker/production
     'core.security_middleware.SecurityHeadersMiddleware',  # SRE: Security headers
     'license.middleware.LicenseCheckMiddleware',
-    'core.trial_middleware.TrialExpiryMiddleware',
     'core.sre_middleware.StructuredLoggingMiddleware',  # SRE: Structured logging (user_id, status_code)
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -113,7 +147,6 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
     'core.outlet_middleware.SubdomainOutletMiddleware',  # Subdomain → outlet_id (demo multi-tenant)
     'core.outlet_middleware.DemoAdminRestrictMiddleware',  # DEMO_MODE: block /admin/ for demo owners
 ]
@@ -232,7 +265,11 @@ CORS_ALLOWED_ORIGINS = [
     "http://pos.hobocustomsoftware.com",
     "https://hobocustomsoftwareposonemonthtrail-production-1289.up.railway.app",
 ] + [o.strip() for o in _CORS_EXTRA.split(',') if o.strip()]
-CORS_ALLOW_ALL_ORIGINS = os.environ.get('CORS_ALLOW_ALL', 'True').lower() in ('true', '1', 'yes')
+# Dev / shared demo: any origin allowed (historic behaviour). Real deployments
+# default to the explicit allow-list above unless CORS_ALLOW_ALL says otherwise.
+CORS_ALLOW_ALL_ORIGINS = os.environ.get(
+    'CORS_ALLOW_ALL', 'True' if (DEBUG or DEMO_MODE) else 'False'
+).lower() in ('true', '1', 'yes')
 
 # CSRF_TRUSTED_ORIGINS (Django 4+) - required for 403/400 on HTTPS POST; env can append
 _CSRF_ORIGINS = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
@@ -454,4 +491,5 @@ LOGGING = {
     },
 }
 
-APPEND_SLASH = True
+APPEND_SLASH = True  # effective value: the earlier `APPEND_SLASH = False` near the
+                        # demo-deployment comment was dead code overwritten here.

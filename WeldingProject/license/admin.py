@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import AppInstallation, AppLicense
+from .models import AppInstallation, AppLicense, BackupAddOn, PlanFeature, SubscriptionPlan
 
 
 @admin.register(AppInstallation)
@@ -15,3 +15,22 @@ class AppLicenseAdmin(admin.ModelAdmin):
     list_filter = ('license_type', 'is_active')
     search_fields = ('license_key', 'machine_id')
     readonly_fields = ('activated_at', 'created_at', 'updated_at')
+
+
+class PlanFeatureInline(admin.TabularInline):
+    model = PlanFeature
+    extra = 0
+
+
+@admin.register(SubscriptionPlan)
+class SubscriptionPlanAdmin(admin.ModelAdmin):
+    list_display = ('code', 'name', 'price_mmk', 'billing_cycle', 'is_active', 'sort_order')
+    list_filter = ('is_active', 'billing_cycle')
+    inlines = [PlanFeatureInline]
+
+
+@admin.register(BackupAddOn)
+class BackupAddOnAdmin(admin.ModelAdmin):
+    list_display = ('license_key', 'machine_id', 'shop', 'is_active', 'expires_at')
+    list_filter = ('is_active',)
+    search_fields = ('license_key', 'machine_id')

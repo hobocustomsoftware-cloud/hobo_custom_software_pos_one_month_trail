@@ -33,10 +33,24 @@ class HealthEndpointsTest(TestCase):
 class ThrottlingUnitTest(TestCase):
     """Unit: Rate limit cache keys."""
 
-    def test_get_ip_from_forwarded(self):
+    def test_get_ip_uses_last_forwarded_hop(self):
+        # Proxy-appended hop is the trustworthy one; left entries are client's.
         class Req:
-            META = {"HTTP_X_FORWARDED_FOR": " 192.168.1.1 , 10.0.0.1 "}
-        self.assertEqual(_get_ip(Req()), "192.168.1.1")
+            META = {"HTTP_X_FORWARDED_FOR": " 1.2.3.4 , 10.0.0.1 "}
+        self.assertEqual(_get_ip(Req()), "10.0.0.1")
+
+    def test_get_ip_forwarded_is_spoof_stable(self):
+        # Rotating only the client-controlled part must not change the key,
+        # otherwise every rate limit (login / license) can be bypassed.
+        real = {"HTTP_X_FORWARDED_FOR": "9.9.9.9, 203.0.113.7"}
+        spoofed = {"HTTP_X_FORWARDED_FOR": "8.8.8.8, 203.0.113.7"}
+
+        class A:
+            META = real
+
+        class B:
+            META = spoofed
+        self.assertEqual(_get_ip(A()), _get_ip(B()))
 
     def test_get_ip_fallback(self):
         class Req:

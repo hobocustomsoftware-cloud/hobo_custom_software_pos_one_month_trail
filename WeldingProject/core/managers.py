@@ -8,12 +8,11 @@ class CustomUserManager(UserManager):
         email = self.normalize_email(email)
         # is_staff ကို ဖယ်ထုတ်စရာမလိုတော့ပါ (Model ရဲ့ save() ထဲမှာ logic ရေးထားပြီးသားမို့လို့ပါ)
         
+        from django.contrib.auth.hashers import make_password
         user = self.model(username=username, email=email, **extra_fields)
         user.set_password(password)
-        
-        # password ကို temp_password ထဲမှာပါ သိမ်းပေးထားခြင်း (Owner ကြည့်ရန်)
-        user.temp_password = password
-        
+        # Hash only: no plaintext credential is ever persisted.
+        user.temp_password = make_password(password) if password else None
         user.save(using=self._db)
         return user
 
