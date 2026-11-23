@@ -1,0 +1,32 @@
+app = 'hobo-custom-software-pos-one-month-trail'
+primary_region = 'ams'
+
+[build]
+  dockerfile = 'compose/Dockerfile.unified'
+  [build.args]
+    VITE_API_URL = '/api'
+    VITE_BASE = '/app/'
+
+[deploy]
+  release_command = 'python manage.py migrate --noinput'
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
+
+  [[http_service.checks]]
+    grace_period = '40s'
+    interval = '30s'
+    method = 'GET'
+    path = '/health/'
+    timeout = '10s'
+
+[env]
+  DJANGO_DEBUG = 'False'
+  DEPLOYMENT_MODE = 'hosted'
+  SKIP_LICENSE = 'true'
+  PORT = '8000'
