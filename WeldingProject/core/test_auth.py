@@ -171,6 +171,42 @@ class RegistrationTest(TestCase):
         r = self.client.post(REGISTER_URL, payload, format="json")
         self.assertEqual(r.status_code, 400)
 
+    def _post_register(self):
+        # TestCase wraps everything in an atomic block, so on_commit
+        # callbacks never fire: capture them and run explicitly.
+        from django.test import TestCase as _TC
+        with _TC.captureOnCommitCallbacks(execute=True):
+            return self.client.post(REGISTER_URL, self.payload, format="json")
+
+    def test_register_dispatches_marketing_via_celery_first(self):
+        """Celery .delay() success → inline sync must NOT also run."""
+        from unittest.mock import patch
+        with patch("core.tasks.sync_new_signup_marketing.delay") as d, \
+             patch("core.external_sync.sync_new_registration") as inline:
+            r = self._post_register()
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertTrue(d.called)
+        inline.assert_not_called()
+
+    def test_register_falls_back_inline_when_celery_fails(self):
+        """Broker down (.delay raises) → exactly one inline sync."""
+        from unittest.mock import patch
+        with patch("core.tasks.sync_new_signup_marketing.delay",
+                    side_effect=ConnectionError("broker down")), \
+             patch("core.external_sync.sync_new_registration") as inline:
+            r = self._post_register()
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertTrue(inline.called)
+
+    def test_register_never_sends_twice(self):
+        """Success path sends via Celery OR inline — count total sends == 1."""
+        from unittest.mock import patch
+        with patch("core.tasks.sync_new_signup_marketing.delay") as d, \
+             patch("core.external_sync.sync_new_registration") as inline:
+            self._post_register()
+        total = int(d.called) + int(inline.called)
+        self.assertEqual(total, 1)
+
     def test_register_rejects_duplicate_phone_regardless_of_spelling(self):
         """The same number typed as 09..., +95... or 95... must not bypass the check."""
         existing = "0950011189"

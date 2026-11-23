@@ -315,6 +315,7 @@ REST_FRAMEWORK = {
         'remote_license': '30/min',
         'auth': '20/min',
         'api_user': '200/min',
+        'public_lookup': '30/min',
     },
 }
 

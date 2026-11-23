@@ -41,22 +41,32 @@ class RegisterView(generics.CreateAPIView):
             logger.exception("Register failed: %s", e)
             raise
         shop_name = (request.data.get('shop_name') or '').strip()
-        # Marketing: Telegram + Google Sheet. Prefer the Celery worker so the
-        # signup response is never blocked by network I/O; fall back to an
-        # inline sync when no worker is running (EXE / single-process dev).
-        queued = False
-        try:
-            from .tasks import sync_new_signup_marketing
-            sync_new_signup_marketing.delay(user.id, shop_name)
-            queued = True
-        except Exception:
-            queued = False
-        if not queued:
+        # Marketing: Telegram + Google Sheet via Celery first, inline fallback.
+        # Dispatched inside transaction.on_commit so the worker never reads an
+        # uncommitted user row; if dispatch itself fails, run the same sync
+        # inline exactly once (never both). Idempotency: the worker task is
+        # keyed per user (task id + cache lock in tasks.py).
+        from django.db import transaction as _txn
+        _uid, _shop = user.id, shop_name
+
+        def _dispatch_marketing():
             try:
-                from .external_sync import sync_new_registration
-                sync_new_registration(user, shop_name=shop_name)
-            except Exception as e2:
-                logging.getLogger(__name__).warning("Registration marketing sync failed: %s", e2)
+                from .tasks import sync_new_signup_marketing
+                sync_new_signup_marketing.delay(_uid, _shop)
+            except Exception:
+                try:
+                    from .external_sync import sync_new_registration
+                    from django.contrib.auth import get_user_model as _gum
+                    _u = _gum().objects.filter(pk=_uid).first()
+                    if _u is not None:
+                        sync_new_registration(_u, shop_name=_shop)
+                except Exception as e2:
+                    logging.getLogger(__name__).warning("Registration marketing sync failed: %s", e2)
+
+        try:
+            _txn.on_commit(_dispatch_marketing)
+        except Exception:
+            _dispatch_marketing()  # no transaction (autocommit test DB edge)
         # စာရင်းသွင်းသူတိုင်း သူ့ဆိုင်ရဲ့ Owner ဖြစ်သွားပြီး ချက်ချင်း ဝင်လို့ရသည်။
         can_login_now = True
         msg = 'Registration successful. You can sign in now.'
