@@ -3,6 +3,7 @@ from rest_framework import viewsets, status, permissions, generics, filters
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.views import APIView
+from core.throttling import PublicLookupThrottle
 from .models import RepairService, RepairSparePart, TreatmentRecord, TreatmentRecordFile
 from .serializers import (
     RepairServiceSerializer, RepairSparePartSerializer,
@@ -94,6 +95,7 @@ class RepairServiceViewSet(viewsets.ModelViewSet):
 class RepairTrackingView(APIView):
     """Customer များ repair_no + phone ဖြင့် Status စစ်ဆေးခြင်း (Public - Login မလိုပါ)"""
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [PublicLookupThrottle]
 
     def get(self, request):
         repair_no = request.query_params.get('repair_no', '').strip()

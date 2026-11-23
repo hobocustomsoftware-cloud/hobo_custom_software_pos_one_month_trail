@@ -41,18 +41,22 @@ class RegisterView(generics.CreateAPIView):
             logger.exception("Register failed: %s", e)
             raise
         shop_name = (request.data.get('shop_name') or '').strip()
-        # Marketing: Telegram + Google Sheet. Run sync in request so it works without Celery worker.
-        try:
-            from .external_sync import sync_new_registration
-            sync_new_registration(user, shop_name=shop_name)
-        except Exception as e2:
-            logging.getLogger(__name__).warning("Registration marketing sync failed: %s", e2)
-        # Optional: also queue for Celery if worker is running (no duplicate send; task is idempotent by design)
+        # Marketing: Telegram + Google Sheet. Prefer the Celery worker so the
+        # signup response is never blocked by network I/O; fall back to an
+        # inline sync when no worker is running (EXE / single-process dev).
+        queued = False
         try:
             from .tasks import sync_new_signup_marketing
             sync_new_signup_marketing.delay(user.id, shop_name)
-        except Exception as e:
-            pass  # already synced above; worker optional
+            queued = True
+        except Exception:
+            queued = False
+        if not queued:
+            try:
+                from .external_sync import sync_new_registration
+                sync_new_registration(user, shop_name=shop_name)
+            except Exception as e2:
+                logging.getLogger(__name__).warning("Registration marketing sync failed: %s", e2)
         # စာရင်းသွင်းသူတိုင်း သူ့ဆိုင်ရဲ့ Owner ဖြစ်သွားပြီး ချက်ချင်း ဝင်လို့ရသည်။
         can_login_now = True
         msg = 'Registration successful. You can sign in now.'

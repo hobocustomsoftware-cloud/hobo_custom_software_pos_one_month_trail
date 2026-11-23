@@ -140,7 +140,6 @@ MIDDLEWARE = [
     'whitenoise.middleware.WhiteNoiseMiddleware',  # Serve static (DRF browsable API CSS, admin) in Docker/production
     'core.security_middleware.SecurityHeadersMiddleware',  # SRE: Security headers
     'license.middleware.LicenseCheckMiddleware',
-    'core.trial_middleware.TrialExpiryMiddleware',
     'core.sre_middleware.StructuredLoggingMiddleware',  # SRE: Structured logging (user_id, status_code)
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',

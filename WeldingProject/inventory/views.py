@@ -37,6 +37,7 @@ from core.permissions import (
     is_cashier_role,
 )
 from core.audit import log_audit
+from core.throttling import PublicLookupThrottle
 from core.outlet_utils import filter_queryset_by_outlet, is_owner, get_request_outlet_id, get_shop_outlet_ids, user_can_access_location
 from rest_framework import serializers
 import logging
@@ -292,8 +293,9 @@ class ProductImportPreviewView(APIView):
 class ProductBulkImportView(APIView):
     """
     Bulk import products from Excel/CSV.
-    TODO: Implement Celery background tasks for massive Excel imports to avoid blocking
-    the main thread and prevent server crashes (SRE: non-blocking bulk import).
+    Small files (<=500 rows) import inline. Larger files go to the Celery
+    worker (`inventory.bulk_import_products`) and return 202 with a task id,
+    so a massive Excel can never block the request thread (SRE).
     POST: multipart/form-data with `file` (Excel or CSV) and `mapping` (JSON string).
     mapping example: {"Model": "model_no", "Product Name": "name", "SKU": "sku", "Price": "retail_price", "Qty": "quantity"}
     - If model_no exists: update stock (inbound movement). Requires optional `location_id` for stock.
@@ -301,6 +303,8 @@ class ProductBulkImportView(APIView):
     Returns: { "imported", "updated", "failed", "errors": [{"row", "reason"}] }
     """
     permission_classes = [IsInventoryManagerOrHigher]
+
+    INLINE_ROW_LIMIT = 500
 
     def _safe_decimal(self, val, default=None):
         if val is None or (isinstance(val, float) and __import__('math').isnan(val)):
@@ -374,6 +378,28 @@ class ProductBulkImportView(APIView):
                 'imported': 0, 'updated': 0, 'failed': 0,
                 'errors': [{'row': 0, 'reason': 'File has no rows.'}],
             }, status=status.HTTP_200_OK)
+
+        # Large files: hand to the worker, never block this thread.
+        try:
+            row_count = int(len(df))
+        except Exception:
+            row_count = self.INLINE_ROW_LIMIT + 1
+        if row_count > self.INLINE_ROW_LIMIT:
+            from .tasks import bulk_import_products
+            payload = {
+                'rows': df.to_dict(orient='records'),
+                'columns': [str(c) for c in df.columns],
+                'mapping': mapping,
+                'location_id': int(location_id) if location_id else None,
+            }
+            try:
+                task = bulk_import_products.delay(payload, request.user.id)
+                return Response({
+                    'accepted': True, 'task_id': task.id, 'rows': row_count,
+                    'message': f'{row_count} rows queued for background import.',
+                }, status=status.HTTP_202_ACCEPTED)
+            except Exception:
+                pass  # no worker running: fall through to inline import
 
         # Rename columns by mapping (excel_col -> our field name)
         rename = {}
@@ -2019,6 +2045,7 @@ class SerialItemUpdateView(generics.UpdateAPIView):
 class WarrantyCheckView(APIView):
     """Serial Number ဖြင့် Warranty စစ်ဆေးခြင်း - GET /api/warranty/check/?serial_number=SN-xxx (Public)"""
     permission_classes = [permissions.AllowAny]  # Customer များ စစ်ဆေးနိုင်ရန်
+    throttle_classes = [PublicLookupThrottle]
 
     def get(self, request):
         serial_number = request.query_params.get('serial_number', '').strip()

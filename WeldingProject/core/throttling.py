@@ -40,6 +40,15 @@ class RemoteLicenseThrottle(SimpleRateThrottle):
         return f'remote_license_{_get_ip(request)}'
 
 
+class PublicLookupThrottle(SimpleRateThrottle):
+    """Public repair/warranty tracking - 30/min per IP (guessable IDs)."""
+    scope = 'public_lookup'
+    rate = '30/min'
+
+    def get_cache_key(self, request, view):
+        return f'public_lookup_{_get_ip(request)}'
+
+
 class AuthThrottle(SimpleRateThrottle):
     """Login / token - 20/min per IP"""
     scope = 'auth'
